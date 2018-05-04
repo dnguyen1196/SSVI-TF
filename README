@@ -1,0 +1,58 @@
+Notes on the implementation
+- round robin update through each column of the factor matrices
+There might not be a need for subsampling if the data matrix/tensor
+is very sparse
+- Note that in theoretical derivations, when we write something N(m, S)
+These are the standard parameters. The difference is that when we update
+Ok no problem, since we are using H-MC-SSVI so the mean standard parameter
+gets updated directly.
+- Note that when doing any sort of sampling, we have to invert the covariance matrix
+- Take note of the deep/shallow copy issue
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
+
+TF_models
+- q_posterior (name, params*)
+- q_prior (name, params*)
+
+- p_likelihood (name, params*)
+- p_prior (name, params*)
+- p_posterior (name, params*)
+
+Need to implement function
+find(dim, i)
+ -> Given the dimension of hidden factor, column number i, parameter number
+ -> returns the value of the parameter being stored
+
+Need to implement function
+
+update(dim, i, param) => as the name implies, update the parameters of some distribution
+
+the appropriate parameters
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
+TF_tensors
+- Need to keep track of O_j
+- dims : an array of dimensions of the tensor
+- order : length of dims?
+- observed : needs to be arranged so that O_j can be easily accessed
+Need to implement the function find(dim, i) that returns an arrya of (tuple, val)
+that denotes the set of tensor entries involving hidden factor [dim][i]
+
+
+Suppse X = U . V . T (3-way tensor)
+So data is duplicated (r . N) where r is the order of the tensor and N
+is the number of actual observed data points in the tensor X
+
+the tensor module needs to provide the capability of searching for Oi
+(The list of tensor entries for which the (dim, i) factor is involved
+
+dim[0] -> U -> [ [(x,y,z),val], [...],...]
+dim[1] -> V ->
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Problem
+- How the matrices are stored
+- Updates formula might be wrong -> look at the derivations again
+- Random sampling to compute both di and Di
+- Where to invert the matrices   ->
