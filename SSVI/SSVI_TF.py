@@ -2,6 +2,7 @@ import Probability.ProbFun as probs
 import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import norm
+import time
 
 """
 SSVI_TF.py
@@ -30,6 +31,15 @@ class H_SSVI_TF_2d():
         self.pmu = np.ones((self.D,))
         self.pSigma = [1 for _ in self.size_per_dim]
 
+        self.likelihood_type = model.p_likelihood.type
+
+        if self.likelihood_type == "normal":
+            self.link_fun = lambda f : f
+        elif self.likelihood_type == "bernoulli":
+            self.link_fun = lambda f : 1. / (1 + np.exp(-f))
+        elif self.likelihood_type == "poisson":
+            self.link_fun = lambda f : np.log(1 + np.exp(-f))
+
         # optimization scheme
         self.opt_scheme = scheme
 
@@ -43,12 +53,6 @@ class H_SSVI_TF_2d():
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
         self.eta = 1
 
-        # schaul-like update window width
-        self.window_size = 5
-        self.recent_gradients_norm_sqr = [np.zeros((s, self.window_size)) for s in self.size_per_dim]
-        self.recent_gradients_sum      = [np.zeros((s, self.window_size)) for s in self.size_per_dim]
-        self.cur_gradient_pos          = [[0 for _ in range(s)] for s in self.size_per_dim]
-
     def factorize(self):
         """
         factorize
@@ -57,11 +61,12 @@ class H_SSVI_TF_2d():
         hidden matrices
         """
         update_column_pointer = [0] * self.order
-
+        start = time.time()
         # while self.check_stop_cond():
         for iteration in range(self.iterations):
+            current = time.time()
             if iteration != 0 and iteration % self.report == 0:
-                print ("iteration: ", iteration, " - MSRE: ", self.evaluate())
+                print ("iteration: ", iteration, " - MSRE: ", self.evaluate(), " - time: ", current - start)
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -110,24 +115,8 @@ class H_SSVI_TF_2d():
         self.model.q_posterior.update(dim, i, (m, S))
 
     def find_step_size_mean_param(self, dim, i, m, mGrad):
-        if self.opt_scheme == "adagrad": # adaGrad
-            self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
-            step_size = self.eta / np.sqrt(self.ada_acc_grad[dim][:, i])
-
-        elif self.opt_scheme == "schaul": # Schaul-like update (before adaDelta)
-            current_grad_pos  = self.cur_gradient_pos[dim][i]
-            numGradients = min(current_grad_pos + 1, self.window_size)
-            self.recent_gradients_norm_sqr[dim][i, current_grad_pos % self.window_size] = norm(mGrad) ** 2
-            self.recent_gradients_sum[dim][i, current_grad_pos % self.window_size] = np.sum(mGrad)
-            self.cur_gradient_pos[dim][i] += 1
-
-            expected_gradient_squared = (np.sum(self.recent_gradients_sum[dim][i, :])/numGradients)**2
-            expected_squares_gradient = np.sum(self.recent_gradients_norm_sqr[dim][i, :])/numGradients
-            # step_size = self.eta * expected_gradient_squared / expected_squares_gradient
-            # The above formula blows up T.T
-            step_size   = self.eta / np.sqrt(expected_squares_gradient)
-
-        return step_size
+        self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
+        return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i])
 
     def estimate_di_Di(self, dim, i, coord, y, m, S):
         """
@@ -179,9 +168,10 @@ class H_SSVI_TF_2d():
         snd_derivative = 0.0
         s = self.model.p_likelihood.params
         for k2 in range(self.k2):
-            f = probs.sample("normal", (meanf, covS))
-            snd_derivative += probs.snd_derivative("normal", (y, f, s))
-            first_derivative += probs.fst_derivative("normal", (y, f, s))
+            f = probs.sample(self.likelihood_type, (meanf, covS))
+            f = self.link_fun(f)
+            snd_derivative += probs.snd_derivative(self.likelihood_type, (y, f, s))
+            first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
         return first_derivative/self.k2, snd_derivative/self.k2
 
     def compute_expected_uis(self, othercols, otherdims):
@@ -200,87 +190,6 @@ class H_SSVI_TF_2d():
             uj_sample = probs.sample("multivariate_normal", (mi, Si))
             uis = np.multiply(uis, uj_sample)
         return uis
-
-    def estimate_di(self, dim, i, coord, y):
-        """
-        :param i:
-        :param dim:
-        :param coord:
-        :param y:
-
-        :return:
-        """
-        other_j     = coord[: dim].append(coord[dim + 1 :])
-        nlist       = list(range(self.order))
-        other_dims  = (nlist[:dim]).append(nlist[dim + 1 : ])
-        di          = np.zeros((self.D, 1))
-
-        (m, S) = self.model.q_posterior.find(dim, i)
-        invS   = np.linalg.inv(S)
-
-        for _ in range(self.k1):
-            ui = np.ones((self.D, 1))
-
-            for d, j in enumerate(other_j):
-                # Get the mean and posterior
-                (mi,Si) = self.model.q_posterior.find(other_dims[d], j)
-                sample = probs.sample("normal", (mi, Si))
-                ui     = np.multiply(ui, sample)
-
-            mf     = np.dot(ui, m)
-            mS     = np.dot(ui, np.dot(invS, ui))
-            acc    = 0.0
-            p_params = self.model.p_likelihood
-
-            for _ in range(self.k2):
-                f  = probs.sample("normal", (mf, mS))
-                acc += probs.fst_derivative("normal", (y, *p_params))
-
-            di = di + ui * acc
-
-        return di/self.k2
-
-    def estimate_Di(self, dim, i, coord, y):
-        """
-        :param i: the id of the column
-        :param dim: the id of the hidden factor
-        :param coord: the coordinate of the observed_by_id entry
-        :param y : the value of the tensor entry
-
-        :return: D_i that is computed according to the formula in the paper
-        """
-
-        # Exclude the dimension to be updated
-        other_j     = coord[: dim].append(coord[dim + 1 :])
-        nlist       = list(range(self.order))
-        other_dims  = (nlist[:dim]).append(nlist[dim + 1 : ])
-        Di          = np.zeros((self.D, self.D))
-
-        (m, S) = self.model.q_posterior.find(dim, i)
-        invS   = np.linalg.inv(S)
-
-        # For each coordinate
-        for _ in range(self.k1):
-            ui = np.ones((self.D, 1))
-            for d, j in enumerate(other_j):
-                # Get the mean and posterior
-                (mi,Si) = self.model.q_posterior.find(other_dims[d], j)
-                sample = probs.sample("normal", (mi, Si))
-                ui     = np.multiply(ui, sample)
-
-            # Get the currnet mean and covariance of the factor
-            mf     = np.dot(ui, m)
-            mS     = np.dot(ui, np.dot(invS, ui))
-            acc    = 0.0
-            p_params = self.model.p_likelihood
-
-            for _ in range(self.k2):
-                f  = probs.sample("normal", (mf, mS))
-                acc += probs.snd_derivative("normal", (y, *p_params))
-
-            Di = Di + np.outer(ui, ui) * acc # Update Di
-
-        return Di/(2*self.k2)
 
     def check_stop_cond(self):
         """
@@ -302,14 +211,15 @@ class H_SSVI_TF_2d():
         return error/len(self.tensor.test_vals)
 
     def predict_likelihood(self, f):
-        ptype = self.model.p_likelihood.type
-        if ptype == "normal":
+        if self.likelihood_type == "normal":
             return f
-        elif ptype == "poisson":
-            return np.log(1 + np.exp(f))
-        elif ptype == "bernoulli":
-            if f < 0.5:
-                return 0
+
+        elif self.likelihood_type == "poisson":
+            # TODO: implement sampling
+            return 1
+
+        elif self.likelihood_type == "bernoulli":
+            # TODO: implement sampling
             return 1
         else:
             raise Exception("Unidentified likelihood type")
@@ -320,6 +230,7 @@ class H_SSVI_TF_2d():
             m, S = self.model.q_posterior.find(dim, col)
             u = np.multiply(u, m)
         f = np.sum(u)
+        f = self.link_fun(f)
         return self.predict_likelihood(f)
 
 

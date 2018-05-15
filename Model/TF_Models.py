@@ -9,7 +9,6 @@ class SSVI_TF_d(object):
         self.p_likelihood = p_likelihood
         self.q_posterior  = q_posterior
         self.p_prior      = p_prior
-        self.likelihood_type     = likelihood_type
 
 """
 Helper distribution class to keep track of a group of distributions

@@ -21,8 +21,13 @@ data.synthesize(dims, means, covariances, hidden_D, 0.8, 0.1)
 # Generate a simple TF_model
 
 D = 20
-# Likelihood function
+# Likelihood function for real valued tensor
 p_likelihood = distribution("normal", 1, ("var"), 1)
+
+# likelihood funcion for binary valued tensor
+# p_likelihood = distribution("bernoulli", 1, None, None)
+
+# likelihood function for count-valued tensor
 
 # Approximate posterior initial
 approximate_mean = np.ones((D,))

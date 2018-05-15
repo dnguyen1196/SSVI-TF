@@ -5,6 +5,9 @@ from numpy.random import multivariate_normal
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
+def sigmoid(x):
+    return 1./(1 + np.exp(-x))
+
 
 """
 Normal distribution
@@ -25,12 +28,27 @@ def normal_snd_derivative(y, f, s):
 """
 Bernoulli distribution (binary-valued tensor)
 """
+def bernoulli_sample(f):
+    return np.random.binomial(1, f)
+
+def bernoulli_fst_derivative(y, f):
+    return y * (1 - sigmoid(y * f))
+
+def bernoulli_snd_derivative(y, f):
+    return -sigmoid(y * f) * sigmoid(-y * f)
 
 
 """
 Poisson distribution (count-valued tensor)
 """
+def poisson_sample(f):
+    return np.random.poisson(lam=f)
 
+def poisson_fst_derivative(y, f):
+    return -np.exp(f) + y
+
+def poisson_snd_derivative(y, f):
+    return -np.exp(f)
 
 """
 MultiNormal distribution
