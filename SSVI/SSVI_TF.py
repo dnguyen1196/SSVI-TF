@@ -9,7 +9,7 @@ SSVI algorithm to learn the hidden matrix factors behind tensor
 factorization
 """
 class H_SSVI_TF_2d():
-    def __init__(self, model, tensor, rank, rho_mean, rho_cov, k1, k2):
+    def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad"):
         """
         :param model:
         :param tensor:
@@ -19,28 +19,35 @@ class H_SSVI_TF_2d():
         self.tensor     = tensor
         self.D          = rank
         self.report     = 1
-        pmu, pSigma     = self.model.p_prior.find(0, 0) # Get true approximate_mean and true Sigma
-        self.pmu = pmu
-        self.pSigma = pSigma
 
-        # List of observed_by_id tensor entries
         self.size_per_dim = tensor.dims        # dimension of the tensors
-        self.order        = len(tensor.dims)
-        self.rho_mean     = rho_mean
+        self.order        = len(tensor.dims)   # number of dimensions
         self.rho_cov      = rho_cov
 
+        # Get prior mean and covariance
+        # self.pmu, self.pSigma = self.model.p_prior.find(0, 0)
+        # self.pmu = [np.ones((self.D, )) for _ in len(self.size_per_dim)]
+        self.pmu = np.ones((self.D,))
+        self.pSigma = [1 for _ in self.size_per_dim]
+
+        # optimization scheme
+        self.opt_scheme = scheme
+
         # Stochastic optimization parameters
-        self.batch_size  = 1
-        # batch size, not needed if we consider all observed entries
-        # involving a particular column U_id when updating (particularly appropriate
-        # for sparse tensor)
-        self.iterations  = 1000
+        self.batch_size  = 1 # batch size not needed for sparse data
+        self.iterations  = 5000
         self.k1          = k1
         self.k2          = k2
-        self.time_step   = [1] * self.order # Keep track of the number of steps taken
-        self.blow_up     = 1
-        self.blow_up_restraint = 0.00005
 
+        # adagrad parameters
+        self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
+        self.eta = 1
+
+        # schaul-like update window width
+        self.window_size = 5
+        self.recent_gradients_norm_sqr = [np.zeros((s, self.window_size)) for s in self.size_per_dim]
+        self.recent_gradients_sum      = [np.zeros((s, self.window_size)) for s in self.size_per_dim]
+        self.cur_gradient_pos          = [[0 for _ in range(s)] for s in self.size_per_dim]
 
     def factorize(self):
         """
@@ -58,15 +65,13 @@ class H_SSVI_TF_2d():
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
-                # Update the natural params of the mth factor
-                # in the ith dimension
+                # Update the natural params of the col-th factor
+                # in the dim-th dimension
                 self.update_natural_params(dim, col)
+                self.update_hyper_parameter(dim)
 
             # Move on to the next column of the hidden matrices
-            # Update the step-size (if appropriate)
             for dim in range(self.order):
-                if (update_column_pointer[dim] + 1 == self.size_per_dim[dim]):
-                    self.time_step[dim] += 1 # increase time step
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.size_per_dim[dim]
 
@@ -76,8 +81,6 @@ class H_SSVI_TF_2d():
         :param dim:
         :return:
         """
-        t = self.time_step[dim]
-
         observed_i = self.tensor.find_observed_ui(dim, i)
         # list of observed_by_id entries
 
@@ -94,20 +97,37 @@ class H_SSVI_TF_2d():
             Di_acc += Di_acc_update
             di_acc += di_acc_update
 
-        rhoS = self.rho_cov(t)
-        S = inv((1-rhoS) * inv(S) + rhoS * (inv(self.pSigma) - 2 * Di_acc))
+        # Update covariance parameter
+        rhoS = self.rho_cov
+        covGrad = (1./self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
+        S = inv((1-rhoS) * inv(S) + rhoS * covGrad)
 
-        rhom = self.rho_mean(t)
-        mupdate = rhom * (np.inner(inv(self.pSigma), self.pmu - m) + di_acc)
-
-        if norm(mupdate - m)/norm(m) > self.blow_up:
-            mupdate = mupdate * self.blow_up_restraint
-        m += mupdate
-
-        # print("Norm of S: ", np.linalg.norm(S))
-        # print("Norm of m: ", np.linalg.norm(m))
+        # Update mean parameter
+        meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
+        step_size  = self.find_step_size_mean_param(dim, i, m, meanGrad)
+        m += np.multiply(step_size, meanGrad)
 
         self.model.q_posterior.update(dim, i, (m, S))
+
+    def find_step_size_mean_param(self, dim, i, m, mGrad):
+        if self.opt_scheme == "adagrad": # adaGrad
+            self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
+            step_size = self.eta / np.sqrt(self.ada_acc_grad[dim][:, i])
+
+        elif self.opt_scheme == "schaul": # Schaul-like update (before adaDelta)
+            current_grad_pos  = self.cur_gradient_pos[dim][i]
+            numGradients = min(current_grad_pos + 1, self.window_size)
+            self.recent_gradients_norm_sqr[dim][i, current_grad_pos % self.window_size] = norm(mGrad) ** 2
+            self.recent_gradients_sum[dim][i, current_grad_pos % self.window_size] = np.sum(mGrad)
+            self.cur_gradient_pos[dim][i] += 1
+
+            expected_gradient_squared = (np.sum(self.recent_gradients_sum[dim][i, :])/numGradients)**2
+            expected_squares_gradient = np.sum(self.recent_gradients_norm_sqr[dim][i, :])/numGradients
+            # step_size = self.eta * expected_gradient_squared / expected_squares_gradient
+            # The above formula blows up T.T
+            step_size   = self.eta / np.sqrt(expected_squares_gradient)
+
+        return step_size
 
     def estimate_di_Di(self, dim, i, coord, y, m, S):
         """
@@ -136,10 +156,23 @@ class H_SSVI_TF_2d():
             Expected_fst_derivative, Expected_snd_derivative = \
                 self.compute_expected_first_snd_derivative(y, meanf, covS)
 
-            di += ui * Expected_fst_derivative/self.k1               # Update di
+            di += ui * Expected_fst_derivative/self.k1                   # Update di
             Di += np.outer(ui, ui) * Expected_snd_derivative/(2*self.k1) # Update Di
 
         return di, Di
+
+    def update_hyper_parameter(self, dim):
+        """
+
+        :param dim:
+        :return:
+        """
+        sigma = 0.0
+        M = self.size_per_dim[dim]
+        for j in range(M):
+            m, S = self.model.q_posterior.find(dim, j)
+            sigma += np.trace(S) + np.dot(m, m)
+        self.pSigma[dim] = sigma/(M*self.D)
 
     def compute_expected_first_snd_derivative(self, y, meanf, covS):
         first_derivative = 0.0
@@ -253,6 +286,7 @@ class H_SSVI_TF_2d():
         """
         :return: boolean
         Check for stopping condition
+
         """
         return
 
@@ -279,7 +313,6 @@ class H_SSVI_TF_2d():
             return 1
         else:
             raise Exception("Unidentified likelihood type")
-
 
     def predict_entry(self, entry):
         u = np.ones((self.D,))

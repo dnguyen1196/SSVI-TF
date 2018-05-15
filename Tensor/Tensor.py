@@ -23,17 +23,17 @@ class tensor(object):
         self.dims = dims
 
         ndim = len(dims)
-        self.matrices = [[]] * ndim
+        matrices = [[]] * ndim
         # Generate the random hidden matrices
         for i in range(ndim):
-            self.matrices[i] = self.create_matrix(dims[i], D, means[i], covariances[i])
+            matrices[i] = self.create_matrix(dims[i], D, means[i], covariances[i])
 
         total         = np.prod(dims) # Total number of possible entries
         observed_num  = int(total * sparsity) # Number of observed_by_id entries
         train_size    = int(observed_num * train) # training set size
 
         observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, self.matrices)
+            = self.organize_observed_entries(observed_num, train_size, dims, matrices)
 
         self.test_entries  = observed_entries[train_size :]
         self.test_vals     = observed_vals[train_size :]

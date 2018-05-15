@@ -5,10 +5,11 @@ SSVI_TF_d
 Model for SSVI tensor factorization
 """
 class SSVI_TF_d(object):
-    def __init__(self, p_likelihood, q_posterior, p_prior):
+    def __init__(self, p_likelihood, q_posterior, p_prior, likelihood_type="normal"):
         self.p_likelihood = p_likelihood
         self.q_posterior  = q_posterior
         self.p_prior      = p_prior
+        self.likelihood_type     = likelihood_type
 
 """
 Helper distribution class to keep track of a group of distributions

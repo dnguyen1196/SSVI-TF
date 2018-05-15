@@ -21,6 +21,17 @@ def normal_fst_derivative(y, f, s):
 def normal_snd_derivative(y, f, s):
     return -1/s
 
+
+"""
+Bernoulli distribution (binary-valued tensor)
+"""
+
+
+"""
+Poisson distribution (count-valued tensor)
+"""
+
+
 """
 MultiNormal distribution
 """
@@ -31,7 +42,17 @@ def sample(name, args):
         return normal_sample(*args)
 
 def fst_derivative(name, args):
-    return normal_fst_derivative(*args)
+    if name == "normal":
+        return normal_fst_derivative(*args)
+    elif name == "poisson":
+        return
+    elif name == "bernoulli":
+        return
 
 def snd_derivative(name, args):
-    return normal_snd_derivative(*args)
+    if name == "normal":
+        return normal_snd_derivative(*args)
+    elif name == "poisson":
+        return
+    elif name == "bernoulli":
+        return
