@@ -1,7 +1,7 @@
 import numpy as np
 
 from Model.TF_Models import SSVI_TF_d, distribution
-from SSVI.SSVI_TF import H_SSVI_TF_2d
+from SSVI.SSVI_TF_d import H_SSVI_TF_2d
 from Tensor.Tensor import tensor
 
 
@@ -24,10 +24,9 @@ p_likelihood = distribution("normal", 1, ("var"), 1)
 
 # likelihood funcion for binary valued tensor
 # p_likelihood = distribution("bernoulli", 1, None, None)
-
 # likelihood function for count-valued tensor
-
 # Approximate posterior initial
+
 approximate_mean = np.ones((D,))
 approximate_cov = np.eye(D)
 q_posterior = distribution("normal", dims, ("mean", "cov"), (approximate_mean, approximate_cov))

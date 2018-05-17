@@ -6,14 +6,11 @@
 - Implement link function
 
 # implement poisson likelihood
-- or is this even correct
+- How to do the expectation computation
 
-# Implement schaul-like scheme and see if it improves on 
-adaGrad
--> Looks like OK 
+# implements batch size capabilities
 
-# Implement adaDelta and see if gives better convergence speed than
-AdaGrad
--> Looks like not
+
+
 
 

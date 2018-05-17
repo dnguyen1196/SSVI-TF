@@ -1,17 +1,17 @@
 import numpy as np
 
 from Model.TF_Models import SSVI_TF_d, distribution
-from SSVI.SSVI_TF import H_SSVI_TF_2d
+from SSVI.SSVI_TF_d import H_SSVI_TF_2d
 from Tensor.Tensor import tensor
 
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims        = [100, 100, 100] # 10 * 10 * 10 tensor
+dims        = [100, 100, 100] # 100 * 100 * 100 tensor
 hidden_D    = 20
 means       = [np.ones((hidden_D,)) * -0.5, np.ones((hidden_D,)) * 0.15, np.ones((hidden_D,)) * 0.1]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
-data = tensor(datatype="binary")
-data.synthesize(dims, means, covariances, hidden_D, 0.8, 0.1)
+data        = tensor(datatype="binary")
+data.synthesize(dims, means, covariances, hidden_D, 0.2, 1)
 
 
 ################## MODEL and FACTORIZATION #########################
@@ -19,13 +19,7 @@ data.synthesize(dims, means, covariances, hidden_D, 0.8, 0.1)
 # Generate a simple TF_model
 
 D = 20
-# Likelihood function for real valued tensor
-# p_likelihood = distribution("normal", 1, ("var"), 1)
-
-# likelihood funcion for binary valued tensor
 p_likelihood = distribution("bernoulli", 1, None, None)
-
-# likelihood function for count-valued tensor
 
 # Approximate posterior initial
 approximate_mean = np.ones((D,))
@@ -39,7 +33,6 @@ p_prior = distribution("normal", 1, ("approximate_mean", "sigma"), (m, S))
 model = SSVI_TF_d(p_likelihood, q_posterior, p_prior, likelihood_type="bernoulli")
 
 ############################### FACTORIZATION ##########################
-
 rho_cov = 0.01
-factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, scheme="adagrad")
+factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, scheme="schaul")
 factorizer.factorize()

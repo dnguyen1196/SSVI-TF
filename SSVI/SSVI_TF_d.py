@@ -10,12 +10,18 @@ SSVI algorithm to learn the hidden matrix factors behind tensor
 factorization
 """
 class H_SSVI_TF_2d():
-    def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad"):
+    def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad", batch_size=5):
         """
+
         :param model:
         :param tensor:
         :param rank:
+        :param rho_cov:
+        :param k1:
+        :param k2:
+        :param scheme:
         """
+
         self.model      = model
         self.tensor     = tensor
         self.D          = rank
@@ -44,24 +50,29 @@ class H_SSVI_TF_2d():
         self.opt_scheme = scheme
 
         # Stochastic optimization parameters
-        self.batch_size  = 1 # batch size not needed for sparse data
+        self.batch_size  = batch_size
         self.iterations  = 5000
         self.k1          = k1
         self.k2          = k2
+
+        # Optimization scheme
         if scheme == "adagrad":
             # adagrad parameters
+            self.offset = 0.0001
             self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
             self.eta = 1
 
         elif scheme == "schaul":
             # schaul-like update window width
             self.window_size = 5
+            self.eta = 1
             self.recent_gradients\
                 = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
 
             self.recent_gradients_sum \
                 = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
             self.cur_gradient_pos = [[0 for _ in range(s)] for s in self.size_per_dim]
+
         elif scheme == "adadelta":
             # adadelta parameters
             self.gamma = 0.1
@@ -109,7 +120,10 @@ class H_SSVI_TF_2d():
         :return:
         """
         observed_i = self.tensor.find_observed_ui(dim, i)
-        # list of observed_by_id entries
+        # print(observed_i)
+        if len(observed_i) > self.batch_size:
+            observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
+            observed_i   = np.take(observed_i, observed_idx, axis=0)
 
         M = len(observed_i)
         (m, S) = self.model.q_posterior.find(dim, i)
@@ -141,6 +155,7 @@ class H_SSVI_TF_2d():
             self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
             return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
 
+
         elif self.opt_scheme == "schaul":
             current_grad_pos = self.cur_gradient_pos[dim][i]
             self.recent_gradients[dim][i][: , current_grad_pos] = mGrad
@@ -151,7 +166,6 @@ class H_SSVI_TF_2d():
             recent_gradients_sum     = np.sum(recent_gradients, 1)
 
             expected_squares_gradient = np.sum(recent_gradients_squared, 1)
-            step_size = np.multiply(np.square(recent_gradients_sum))
 
             return self.eta / np.sqrt(expected_squares_gradient) * mGrad
 
@@ -252,7 +266,6 @@ class H_SSVI_TF_2d():
         """
         :return: boolean
         Check for stopping condition
-
         """
         return
 
@@ -303,10 +316,23 @@ class H_SSVI_TF_2d():
 
         elif self.likelihood_type == "bernoulli":
             # print(m)
-            # f = self.link_fun(m)
+            f = self.link_fun(m)
             return 1 if m >= 0.5 else -1
         else:
             raise Exception("Unidentified likelihood type")
+
+
+
+    def compute_expected_count(self, hermite_weights):
+
+
+        return
+
+
+    def compute_gauss_hermite(self, f, n):
+
+        return
+
 
     def predict_entry(self, entry):
         u = np.ones((self.D,))

@@ -28,6 +28,8 @@ class tensor(object):
         :param sparsity:
         :return:
         """
+        print("Generating synthetic data ... ")
+        start = time.time()
         self.dims = dims
 
         ndim = len(dims)
@@ -47,6 +49,8 @@ class tensor(object):
         self.test_vals     = observed_vals[train_size :]
         self.train_entries = observed_entries[: train_size]
         self.train_vals    = observed_vals[: train_size]
+        end = time.time()
+        print("Generating synthetic data took: ", end- start)
 
     def organize_observed_entries(self, observed_num, train_size, dims, matrices):
         ndim = len(dims)
@@ -111,7 +115,7 @@ class tensor(object):
 
     def generate_unique_coords(self, num):
         total = np.prod(self.dims)
-        idx = np.random.permutation(total)[0 : num]
+        idx = np.random.choice(total, num, replace=False)
 
         divs = []
         for i, s in enumerate(self.dims):
