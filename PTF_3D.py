@@ -1,6 +1,4 @@
-
 import numpy as np
-# np.random.seed(123)
 
 from Model.TF_Models import SSVI_TF_d, distribution
 from SSVI.SSVI_TF import H_SSVI_TF_2d
@@ -43,8 +41,5 @@ model = SSVI_TF_d(p_likelihood, q_posterior, p_prior)
 ############################### FACTORIZATION ##########################
 
 rho_cov = 0.01
-k1 = 1
-k2 = 10
-
-factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov)
+factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, scheme="adagrad")
 factorizer.factorize()

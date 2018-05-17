@@ -1,12 +1,19 @@
 import numpy as np
 from numpy.random import multivariate_normal
+import warnings
+
+warnings.filterwarnings("error")
 
 """
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
 def sigmoid(x):
-    return 1./(1 + np.exp(-x))
+    try:
+        res = 1./(1 + np.exp(-x))
+        return res
+    except Warning:
+        return 0
 
 
 """
@@ -28,13 +35,13 @@ def normal_snd_derivative(y, f, s):
 """
 Bernoulli distribution (binary-valued tensor)
 """
-def bernoulli_sample(f):
+def bernoulli_sample(f, s=None):
     return np.random.binomial(1, f)
 
-def bernoulli_fst_derivative(y, f):
+def bernoulli_fst_derivative(y, f, s=None):
     return y * (1 - sigmoid(y * f))
 
-def bernoulli_snd_derivative(y, f):
+def bernoulli_snd_derivative(y, f, s=None):
     return -sigmoid(y * f) * sigmoid(-y * f)
 
 
@@ -63,14 +70,14 @@ def fst_derivative(name, args):
     if name == "normal":
         return normal_fst_derivative(*args)
     elif name == "poisson":
-        return
+        return poisson_fst_derivative(*args)
     elif name == "bernoulli":
-        return
+        return bernoulli_fst_derivative(*args)
 
 def snd_derivative(name, args):
     if name == "normal":
         return normal_snd_derivative(*args)
     elif name == "poisson":
-        return
+        return poisson_snd_derivative(*args)
     elif name == "bernoulli":
-        return
+        return bernoulli_snd_derivative(*args)

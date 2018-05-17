@@ -34,11 +34,11 @@ class H_SSVI_TF_2d():
         self.likelihood_type = model.p_likelihood.type
 
         if self.likelihood_type == "normal":
-            self.link_fun = lambda f : f
+            self.link_fun = lambda m : m
         elif self.likelihood_type == "bernoulli":
-            self.link_fun = lambda f : 1. / (1 + np.exp(-f))
+            self.link_fun = lambda m : 1. /(1 + np.exp(-m))
         elif self.likelihood_type == "poisson":
-            self.link_fun = lambda f : np.log(1 + np.exp(-f))
+            self.link_fun = lambda m : np.log(1 + np.exp(-m))
 
         # optimization scheme
         self.opt_scheme = scheme
@@ -48,10 +48,31 @@ class H_SSVI_TF_2d():
         self.iterations  = 5000
         self.k1          = k1
         self.k2          = k2
+        if scheme == "adagrad":
+            # adagrad parameters
+            self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
+            self.eta = 1
 
-        # adagrad parameters
-        self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
-        self.eta = 1
+        elif scheme == "schaul":
+            # schaul-like update window width
+            self.window_size = 5
+            self.recent_gradients\
+                = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
+
+            self.recent_gradients_sum \
+                = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
+            self.cur_gradient_pos = [[0 for _ in range(s)] for s in self.size_per_dim]
+        elif scheme == "adadelta":
+            # adadelta parameters
+            self.gamma = 0.1
+            self.offset = 0.0001
+            self.alpha = 1
+            self.g_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
+            self.s_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
+
+            # nesterov accelerated gradient
+            self.momentum = 0.9
+            self.delta_theta_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
 
     def factorize(self):
         """
@@ -66,7 +87,8 @@ class H_SSVI_TF_2d():
         for iteration in range(self.iterations):
             current = time.time()
             if iteration != 0 and iteration % self.report == 0:
-                print ("iteration: ", iteration, " - MSRE: ", self.evaluate(), " - time: ", current - start)
+                print ("iteration: ", iteration, " - test error: ", \
+                       self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start)
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -109,14 +131,49 @@ class H_SSVI_TF_2d():
 
         # Update mean parameter
         meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-        step_size  = self.find_step_size_mean_param(dim, i, m, meanGrad)
-        m += np.multiply(step_size, meanGrad)
+        update   = self.compute_update_mean_param(dim, i, m, meanGrad)
+        m = np.add(update, m)
 
         self.model.q_posterior.update(dim, i, (m, S))
 
-    def find_step_size_mean_param(self, dim, i, m, mGrad):
-        self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
-        return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i])
+    def compute_update_mean_param(self, dim, i, m, mGrad):
+        if self.opt_scheme == "adagrad":
+            self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
+            return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
+
+        elif self.opt_scheme == "schaul":
+            current_grad_pos = self.cur_gradient_pos[dim][i]
+            self.recent_gradients[dim][i][: , current_grad_pos] = mGrad
+            self.cur_gradient_pos[dim][i] = (self.cur_gradient_pos[dim][i] + 1) % self.window_size
+
+            recent_gradients         = self.recent_gradients[dim][i]
+            recent_gradients_squared = np.square(recent_gradients)
+            recent_gradients_sum     = np.sum(recent_gradients, 1)
+
+            expected_squares_gradient = np.sum(recent_gradients_squared, 1)
+            step_size = np.multiply(np.square(recent_gradients_sum))
+
+            return self.eta / np.sqrt(expected_squares_gradient) * mGrad
+
+        elif self.opt_scheme == "adadelta":
+            g_0 = self.g_t[dim][i]
+            s_0 = self.s_t[dim][i]
+
+            # Update g_t
+            g_t = (1. - self.gamma) * np.square(mGrad) + self.gamma * g_0
+            self.g_t[dim][i] = g_t
+
+            # Compute gradient update
+            delta_theta_t = self.alpha * \
+                        np.divide(np.sqrt(np.add(s_0, self.offset)), \
+                                  np.sqrt(np.add(g_t, self.offset))) * mGrad
+
+            # Update s_t
+            self.s_t[dim][i] = (1 - self.gamma) * np.square(delta_theta_t) + self.gamma * s_0
+
+            # Update deltaTheta_t
+            self.delta_theta_t[dim][i] = delta_theta_t
+            return delta_theta_t
 
     def estimate_di_Di(self, dim, i, coord, y, m, S):
         """
@@ -167,9 +224,9 @@ class H_SSVI_TF_2d():
         first_derivative = 0.0
         snd_derivative = 0.0
         s = self.model.p_likelihood.params
+
         for k2 in range(self.k2):
             f = probs.sample(self.likelihood_type, (meanf, covS))
-            f = self.link_fun(f)
             snd_derivative += probs.snd_derivative(self.likelihood_type, (y, f, s))
             first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
         return first_derivative/self.k2, snd_derivative/self.k2
@@ -199,7 +256,26 @@ class H_SSVI_TF_2d():
         """
         return
 
-    def evaluate(self):
+
+    def evaluate_train_error(self):
+        """
+        :return:
+        """
+        error = 0.0
+        for i, entry in enumerate(self.tensor.train_entries):
+            predict = self.predict_entry(entry)
+            correct = self.tensor.train_vals[i]
+            if self.likelihood_type == "normal":
+                error += np.abs(predict - correct)/abs(correct)
+            elif self.likelihood_type == "bernoulli":
+                error += 1 if predict != correct else 0
+            else:
+                return 0
+
+        return error/len(self.tensor.train_vals)
+
+
+    def evaluate_test_error(self):
         """
         :return:
         """
@@ -207,20 +283,28 @@ class H_SSVI_TF_2d():
         for i, entry in enumerate(self.tensor.test_entries):
             predict = self.predict_entry(entry)
             correct = self.tensor.test_vals[i]
-            error += np.abs(predict - correct)/abs(correct)
+            if self.likelihood_type == "normal":
+                error += np.abs(predict - correct)/abs(correct)
+            elif self.likelihood_type == "bernoulli":
+                error += 1 if predict != correct else 0
+            else:
+                return 0
+
         return error/len(self.tensor.test_vals)
 
-    def predict_likelihood(self, f):
+    def predict_y_given_m(self, m):
         if self.likelihood_type == "normal":
-            return f
+            return m
 
         elif self.likelihood_type == "poisson":
-            # TODO: implement sampling
+            f = self.link_fun(m)
+            #TODO: implement
             return 1
 
         elif self.likelihood_type == "bernoulli":
-            # TODO: implement sampling
-            return 1
+            # print(m)
+            # f = self.link_fun(m)
+            return 1 if m >= 0.5 else -1
         else:
             raise Exception("Unidentified likelihood type")
 
@@ -229,9 +313,8 @@ class H_SSVI_TF_2d():
         for dim, col in enumerate(entry):
             m, S = self.model.q_posterior.find(dim, col)
             u = np.multiply(u, m)
-        f = np.sum(u)
-        f = self.link_fun(f)
-        return self.predict_likelihood(f)
+        m = np.sum(u)
+        return self.predict_y_given_m(m)
 
 
 

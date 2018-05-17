@@ -44,4 +44,4 @@ factorizer.factorize()
 
 print("Approximate: ", model.q_posterior.find(0, 0)[0])
 print("Actual: ", data.matrices[0][0, :])
-print("MSRE: ", factorizer.evaluate())
+print("MSRE: ", factorizer.evaluate_test_error())

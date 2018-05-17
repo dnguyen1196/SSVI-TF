@@ -4,10 +4,18 @@ Contains definitinos of different data structures that are
 needed in data representation and storage.
 """
 import  numpy as np
+import time
 
 class tensor(object):
-    def __init__(self):
-        return
+    def __init__(self, datatype="real"):
+        assert(datatype in ["real", "ordinal", "count", "binary"])
+        self.datatype = datatype
+        if self.datatype == "real":
+            self.link_fun = lambda m : m
+        elif self.datatype == "binary":
+            self.link_fun = lambda m : m
+        elif self.datatype == "count":
+            self.link_fun = lambda m : np.log(1 + np.exp(-m))
 
     # synthesize data according to some model
     def synthesize(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
@@ -42,16 +50,7 @@ class tensor(object):
 
     def organize_observed_entries(self, observed_num, train_size, dims, matrices):
         ndim = len(dims)
-        observed_entries = []
-        unique = set()
-
-        while len(observed_entries) < observed_num:
-            # For each dimension, pick a hidden vector randomly
-            rand_indices = [np.random.choice(dims[n]) for n in range(ndim)]
-            uniq_id = "".join(str(e) for e in rand_indices)
-            if not (uniq_id in unique):
-                observed_entries.append(rand_indices)
-                unique.add(uniq_id)
+        observed_entries = self.generate_unique_coords(observed_num)
 
         observed_vals          = [0] * len(observed_entries)
         self.observed_by_id    = [[] for _ in range(ndim)]
@@ -66,14 +65,25 @@ class tensor(object):
                 row_num  = entry[dim]
                 ui  = np.multiply(ui, matrices[dim][row_num, :])
 
-            y = np.sum(ui)
-            observed_vals[entry_num] = y
+            m = np.sum(ui)
+            m = self.actual_value(m)
+
+            observed_vals[entry_num] = m
             if entry_num < train_size:
                 for dim in range(ndim):
                     row_num = entry[dim]
-                    self.observed_by_id[dim][row_num].append((entry, y))
+                    self.observed_by_id[dim][row_num].append((entry, m))
 
         return observed_entries, observed_vals
+
+    def actual_value(self, m):
+        m = self.link_fun(m)
+        if self.datatype == "real":
+            return m
+        elif self.datatype == "binary":
+            return 1 if m > 1/2 else -1
+        else:
+            return None
 
     def create_matrix(self, nrow, ncol, m, S):
         """
@@ -99,6 +109,28 @@ class tensor(object):
         hidden_matrix = self.observed_by_id[dim]
         return hidden_matrix[i]
 
+    def generate_unique_coords(self, num):
+        total = np.prod(self.dims)
+        idx = np.random.permutation(total)[0 : num]
+
+        divs = []
+        for i, s in enumerate(self.dims):
+            otherdims = self.dims[i+1 : ]
+            divs.append(np.prod(otherdims))
+
+        unique_coords = []
+        for id in idx:
+            unique_coords.append(self.id_to_coordinate(id, divs))
+        return unique_coords
+
+    def id_to_coordinate(self, id, divs):
+        coord = []
+        id = float(id)
+        for dim, size in enumerate(divs):
+            k = int(id/size)
+            coord.append(k)
+            id -= size * k
+        return coord
 
     # TODO: implement
     def load_data(self, filename):

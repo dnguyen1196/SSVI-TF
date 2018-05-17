@@ -1,22 +1,19 @@
-# step-size for covariance matrix 
-- checked
 
-# Add update formula for covariance parameter
-- checked
-
-# Identify places where it can run out of memories 
-(think about diagonal matrix formulation vs full matrix formulation)
-(may be it's bound to happen?)
-
- 1000 X 1000 X 1000
  
- 3000 factors * (D mean + D^2 covariance)
- if D = 20, 400 * 3000 = 1 200 000 (not that much ay)
- 
-# Implement binary and poisson likelihood
+# Implement binary 
+- why is the decision rule m >= 1/2 and without using a link function
 - Start with distribution.py
 - Implement link function
 
+# implement poisson likelihood
+- or is this even correct
 
-# Fix the synthesize function (right now still checking for duplicates
-which takes a lot of time)
+# Implement schaul-like scheme and see if it improves on 
+adaGrad
+-> Looks like OK 
+
+# Implement adaDelta and see if gives better convergence speed than
+AdaGrad
+-> Looks like not
+
+
