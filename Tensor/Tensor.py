@@ -7,18 +7,25 @@ import  numpy as np
 import time
 
 class tensor(object):
-    def __init__(self, datatype="real"):
+    def  __init__(self, datatype="real", binary_cutoff=0.0):
+        """
+
+        :param datatype:
+        :param binary_cutoff:
+        """
         assert(datatype in ["real", "ordinal", "count", "binary"])
         self.datatype = datatype
         if self.datatype == "real":
             self.link_fun = lambda m : m
         elif self.datatype == "binary":
-            self.link_fun = lambda m : m
+            self.link_fun = lambda m : 1. / (1. + np.exp(-m))
+            self.binary_cutoff = binary_cutoff
         elif self.datatype == "count":
             self.link_fun = lambda m : np.log(1 + np.exp(-m))
 
     # synthesize data according to some model
     def synthesize(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
+
         """
         :param dims:
         :param means:
@@ -49,10 +56,13 @@ class tensor(object):
         self.test_vals     = observed_vals[train_size :]
         self.train_entries = observed_entries[: train_size]
         self.train_vals    = observed_vals[: train_size]
+
         if self.datatype == "binary":
             num_ones = np.sum(self.test_vals)
             num_minus = (len(self.test_vals) -  num_ones)/2
             print("There are: ", num_minus, " -1's value out of ", len(self.test_vals), " test values")
+
+        # self.verify_binary_entries(matrices)
 
         end = time.time()
         print("Generating synthetic data took: ", end- start)
@@ -75,22 +85,23 @@ class tensor(object):
                 ui  = np.multiply(ui, matrices[dim][row_num, :])
 
             m = np.sum(ui)
-            m = self.actual_value(m)
+            f = self.actual_value(m)
+            if self.datatype == "binary":
+                assert(f * (m- self.binary_cutoff) > 0)
 
-            observed_vals[entry_num] = m
+            observed_vals[entry_num] = f
             if entry_num < train_size:
                 for dim in range(ndim):
                     row_num = entry[dim]
-                    self.observed_by_id[dim][row_num].append((entry, m))
+                    self.observed_by_id[dim][row_num].append((entry, f))
 
         return observed_entries, observed_vals
 
     def actual_value(self, m):
-        m = self.link_fun(m)
         if self.datatype == "real":
             return m
         elif self.datatype == "binary":
-            return 1 if m >= 0.5 else -1
+            return 1 if m >= self.binary_cutoff else -1
         else:
             return None
 
@@ -148,3 +159,16 @@ class tensor(object):
         :return: 
         """
         pass
+
+    def verify_binary_entries(self, matrices):
+        for i in range(len(self.train_vals)):
+            actual = self.train_vals[i]
+            entry  = self.train_entries[i]
+            ui     = np.ones_like(matrices[0][0, :])
+            ndim   = len(entry)
+            for dim in range(ndim):
+                row_num  = entry[dim]
+                ui  = np.multiply(ui, matrices[dim][row_num, :])
+            m = np.sum(ui)
+            f = self.actual_value(m)
+            assert (f == actual)

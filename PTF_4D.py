@@ -30,19 +30,19 @@ p_likelihood = distribution("normal", 1, ("var"), 1)
 # likelihood function for count-valued tensor
 
 # Approximate posterior initial
-approximate_mean = np.ones((D,))
+approximate_mean = np.ones((D,)) * 5
 approximate_cov = np.eye(D)
 q_posterior = distribution("normal", dims, ("mean", "cov"), (approximate_mean, approximate_cov))
 
 # Model prior
 m = np.ones((D,))
 S = np.eye(D)
-p_prior = distribution("normal", 1, ("approximate_mean", "sigma"), (m, S))
+p_prior = distribution("normal", 1, ("approximate_mean_0", "sigma"), (m, S))
 model = SSVI_TF_d(p_likelihood, q_posterior, p_prior)
 
 ############################### FACTORIZATION ##########################
 
-rho_cov = 0.01
+rho_cov = lambda t: 0.01
 k1 = 1
 k2 = 10
 

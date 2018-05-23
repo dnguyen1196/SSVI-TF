@@ -6,31 +6,31 @@ from Tensor.Tensor import tensor
 
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims        = [50, 50, 50] # 100 * 100 * 100 tensor
-hidden_D    = 5
-means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0.]
-covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
+dims        = [100, 100, 100] # 100 * 100 * 100 tensor
+hidden_D    = 10
+means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
+covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
 data        = tensor(datatype="binary")
 
-data.synthesize(dims, means, covariances, hidden_D, 0.5, 1)
+data.synthesize(dims, means, covariances, hidden_D, 0.5, 0.1)
 
 
 ################## MODEL and FACTORIZATION #########################
 # The below two modules have to agree with one another on dimension
 # Generate a simple TF_model
 
-D = 5
+D = 10
 p_likelihood = distribution("bernoulli", 1, None, None)
 
 # Approximate posterior initial guess
-approximate_mean = np.ones((D,))
-approximate_cov = np.eye(D)
-q_posterior = distribution("normal", dims, ("mean", "cov"), (approximate_mean, approximate_cov))
+approximate_mean_0 = np.ones((D,)) * 0
+approximate_cov_0 = np.eye(D)
+q_posterior = distribution("normal", dims, ("mean", "cov"), (approximate_mean_0, approximate_cov_0))
 
 # Model prior
-m = np.ones((D,)) * 0.5
+m = np.zeros((D,))
 S = np.eye(D)
-p_prior = distribution("normal", 1, ("approximate_mean", "sigma"), (m, S))
+p_prior = distribution("normal", 1, ("mean", "sigma"), (m, S))
 model = SSVI_TF_d(p_likelihood, q_posterior, p_prior, likelihood_type="bernoulli")
 
 ############################### FACTORIZATION ##########################

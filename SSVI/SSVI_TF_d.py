@@ -36,10 +36,11 @@ class H_SSVI_TF_2d():
 
         self.likelihood_type = model.p_likelihood.type
 
+
         if self.likelihood_type == "normal":
             self.link_fun = lambda m : m
         elif self.likelihood_type == "bernoulli":
-            self.link_fun = lambda m : 1. /(1 + np.exp(-m))
+            self.link_fun = lambda m : probs.sigmoid(m)
         elif self.likelihood_type == "poisson":
             self.link_fun = lambda m : np.log(1 + np.exp(-m))
 
@@ -160,8 +161,8 @@ class H_SSVI_TF_2d():
         else:
             m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
 
-        # print(np.linalg.norm(m_update))
         m += m_update
+        # print(np.linalg.norm(m_update))
         self.model.q_posterior.update(dim, i, (m, S))
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
