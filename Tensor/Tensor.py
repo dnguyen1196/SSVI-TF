@@ -49,6 +49,11 @@ class tensor(object):
         self.test_vals     = observed_vals[train_size :]
         self.train_entries = observed_entries[: train_size]
         self.train_vals    = observed_vals[: train_size]
+        if self.datatype == "binary":
+            num_ones = np.sum(self.test_vals)
+            num_minus = (len(self.test_vals) -  num_ones)/2
+            print("There are: ", num_minus, " -1's value out of ", len(self.test_vals), " test values")
+
         end = time.time()
         print("Generating synthetic data took: ", end- start)
 
@@ -85,7 +90,7 @@ class tensor(object):
         if self.datatype == "real":
             return m
         elif self.datatype == "binary":
-            return 1 if m > 1/2 else -1
+            return 1 if m >= 0.5 else -1
         else:
             return None
 

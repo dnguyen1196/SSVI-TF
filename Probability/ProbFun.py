@@ -36,13 +36,13 @@ def normal_snd_derivative(y, f, s):
 Bernoulli distribution (binary-valued tensor)
 """
 def bernoulli_sample(f, s=None):
-    return np.random.binomial(1, f)
+    return np.random.binomial(1, sigmoid(f))
 
 def bernoulli_fst_derivative(y, f, s=None):
     return y * (1 - sigmoid(y * f))
 
 def bernoulli_snd_derivative(y, f, s=None):
-    return -sigmoid(y * f) * sigmoid(-y * f)
+    return -np.square(y) * sigmoid(y * f) * sigmoid(-y * f)
 
 
 """

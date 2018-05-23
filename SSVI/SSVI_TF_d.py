@@ -12,14 +12,13 @@ factorization
 class H_SSVI_TF_2d():
     def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad", batch_size=5):
         """
-
-        :param model:
+        :param model: the generative model behind factorization
         :param tensor:
         :param rank:
-        :param rho_cov:
-        :param k1:
-        :param k2:
-        :param scheme:
+        :param rho_cov: step size formula for covariance parameter
+        :param k1: number of samples for hidden column vectors
+        :param k2: number of samples for f variables
+        :param scheme: optimization scheme
         """
 
         self.model      = model
@@ -32,8 +31,6 @@ class H_SSVI_TF_2d():
         self.rho_cov      = rho_cov
 
         # Get prior mean and covariance
-        # self.pmu, self.pSigma = self.model.p_prior.find(0, 0)
-        # self.pmu = [np.ones((self.D, )) for _ in len(self.size_per_dim)]
         self.pmu = np.ones((self.D,))
         self.pSigma = [1 for _ in self.size_per_dim]
 
@@ -48,6 +45,8 @@ class H_SSVI_TF_2d():
 
         # optimization scheme
         self.opt_scheme = scheme
+
+        self.time_step = [1 for _ in range(self.order)]
 
         # Stochastic optimization parameters
         self.batch_size  = batch_size
@@ -64,13 +63,14 @@ class H_SSVI_TF_2d():
 
         elif scheme == "schaul":
             # schaul-like update window width
-            self.window_size = 5
+            self.window_size = 1
             self.eta = 1
-            self.recent_gradients\
+            self.recent_gradients \
                 = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
 
             self.recent_gradients_sum \
                 = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
+
             self.cur_gradient_pos = [[0 for _ in range(s)] for s in self.size_per_dim]
 
         elif scheme == "adadelta":
@@ -84,6 +84,9 @@ class H_SSVI_TF_2d():
             # nesterov accelerated gradient
             self.momentum = 0.9
             self.delta_theta_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
+
+        elif scheme == "sgd":
+            self.rho = lambda t : 1./(t+1)
 
     def factorize(self):
         """
@@ -105,19 +108,23 @@ class H_SSVI_TF_2d():
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
                 # in the dim-th dimension
-                self.update_natural_params(dim, col)
-                self.update_hyper_parameter(dim)
+                self.update_natural_params(dim, col, iteration)
+                self.update_hyper_parameter(dim, iteration)
 
             # Move on to the next column of the hidden matrices
             for dim in range(self.order):
+                if (update_column_pointer[dim] + 1 == self.size_per_dim[dim]):
+                    self.time_step[dim] += 1  # increase time step
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.size_per_dim[dim]
 
-    def update_natural_params(self, dim, i):
+    def update_natural_params(self, dim, i, iteration):
         """
         :param i:
         :param dim:
         :return:
+        Update the natural parameter for the hidden column vector
+        of dimension dim and column i
         """
         observed_i = self.tensor.find_observed_ui(dim, i)
         # print(observed_i)
@@ -138,19 +145,37 @@ class H_SSVI_TF_2d():
             Di_acc += Di_acc_update
             di_acc += di_acc_update
 
+        Di_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
+        di_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
+
         # Update covariance parameter
-        rhoS = self.rho_cov
+        rhoS = self.rho_cov(iteration)
         covGrad = (1./self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
         S = inv((1-rhoS) * inv(S) + rhoS * covGrad)
 
         # Update mean parameter
         meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-        update   = self.compute_update_mean_param(dim, i, m, meanGrad)
-        m = np.add(update, m)
+        if self.opt_scheme == "sgd":
+            m_update = self.rho(iteration) * meanGrad
+        else:
+            m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
 
+        # print(np.linalg.norm(m_update))
+        m += m_update
         self.model.q_posterior.update(dim, i, (m, S))
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
+        """
+
+        :param dim: dimension of the hidden matrix
+        :param i: column of hidden matrix
+        :param m: current value of mean parameter
+        :param mGrad: computed gradient
+        :return:
+
+        Compute the update for the mean parameter dependnig on the
+        optimization scheme
+        """
         if self.opt_scheme == "adagrad":
             self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
             return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
@@ -196,6 +221,10 @@ class H_SSVI_TF_2d():
         :param coord:
         :param y:
         :return:
+
+        Estimate the di and Di (see paper for details) based
+        on the given coordinate point, its value y, current
+        mean and covariance m, S
         """
         othercols    = coord[: dim]
         othercols.extend(coord[dim + 1 :])
@@ -221,9 +250,8 @@ class H_SSVI_TF_2d():
 
         return di, Di
 
-    def update_hyper_parameter(self, dim):
+    def update_hyper_parameter(self, dim, iteration):
         """
-
         :param dim:
         :return:
         """
@@ -234,15 +262,16 @@ class H_SSVI_TF_2d():
             sigma += np.trace(S) + np.dot(m, m)
         self.pSigma[dim] = sigma/(M*self.D)
 
-    def compute_expected_first_snd_derivative(self, y, meanf, covS):
+    def compute_expected_first_snd_derivative(self, y, meanf, covS) :
         first_derivative = 0.0
         snd_derivative = 0.0
         s = self.model.p_likelihood.params
 
         for k2 in range(self.k2):
-            f = probs.sample(self.likelihood_type, (meanf, covS))
+            f = probs.sample("normal", (meanf, covS))
             snd_derivative += probs.snd_derivative(self.likelihood_type, (y, f, s))
             first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
+
         return first_derivative/self.k2, snd_derivative/self.k2
 
     def compute_expected_uis(self, othercols, otherdims):
@@ -269,7 +298,6 @@ class H_SSVI_TF_2d():
         """
         return
 
-
     def evaluate_train_error(self):
         """
         :return:
@@ -287,52 +315,46 @@ class H_SSVI_TF_2d():
 
         return error/len(self.tensor.train_vals)
 
-
     def evaluate_test_error(self):
         """
         :return:
         """
         error = 0.0
-        for i, entry in enumerate(self.tensor.test_entries):
-            predict = self.predict_entry(entry)
+        for i in range(len(self.tensor.test_entries)):
+            predict = self.predict_entry(self.tensor.test_entries[i])
             correct = self.tensor.test_vals[i]
+
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
             elif self.likelihood_type == "bernoulli":
+                # if predict != correct:
+                #     print ("errror: ", predict, correct)
                 error += 1 if predict != correct else 0
             else:
                 return 0
-
         return error/len(self.tensor.test_vals)
 
     def predict_y_given_m(self, m):
         if self.likelihood_type == "normal":
             return m
-
         elif self.likelihood_type == "poisson":
             f = self.link_fun(m)
-            #TODO: implement
-            return 1
+            #TODO: implement Laplace approximation
 
+            return 1
         elif self.likelihood_type == "bernoulli":
-            # print(m)
-            f = self.link_fun(m)
-            return 1 if m >= 0.5 else -1
+            return 1 if self.link_fun(m) >= 1/2 else -1
         else:
             raise Exception("Unidentified likelihood type")
-
-
 
     def compute_expected_count(self, hermite_weights):
 
 
         return
 
-
     def compute_gauss_hermite(self, f, n):
 
         return
-
 
     def predict_entry(self, entry):
         u = np.ones((self.D,))

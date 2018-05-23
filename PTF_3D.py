@@ -40,5 +40,5 @@ model = SSVI_TF_d(p_likelihood, q_posterior, p_prior)
 ############################### FACTORIZATION ##########################
 
 rho_cov = 0.01
-factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, scheme="adagrad")
+factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, scheme="schaul")
 factorizer.factorize()
