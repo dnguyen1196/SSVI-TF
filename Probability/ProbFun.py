@@ -14,9 +14,9 @@ def sigmoid(x):
         return res
     except Warning:
         if x < 0:
-            return 0.00001
+            return 0.00000001
         else:
-            return 0.99999
+            return 0.99999999
 
 def sigmoid_overflow(x):
     try:

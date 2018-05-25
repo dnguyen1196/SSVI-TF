@@ -33,6 +33,7 @@ class H_SSVI_TF_2d():
         # Get prior mean and covariance
         self.pmu = np.ones((self.D,))
         self.pSigma = [1 for _ in self.size_per_dim]
+
         self.likelihood_type = model.p_likelihood.type
 
 
@@ -50,14 +51,43 @@ class H_SSVI_TF_2d():
 
         # Stochastic optimization parameters
         self.batch_size  = batch_size
-        self.iterations  = 6000
+        self.iterations  = 5000
         self.k1          = k1
         self.k2          = k2
 
-        # adagrad parameters
-        self.offset = 0.0001
-        self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
-        self.eta = 1
+        # Optimization scheme
+        if scheme == "adagrad":
+            # adagrad parameters
+            self.offset = 0.0001
+            self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
+            self.eta = 1
+
+        elif scheme == "schaul":
+            # schaul-like update window width
+            self.window_size = 1
+            self.eta = 1
+            self.recent_gradients \
+                = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
+
+            self.recent_gradients_sum \
+                = [[np.zeros((self.D, self.window_size)) for _ in range(s)] for s in self.size_per_dim]
+
+            self.cur_gradient_pos = [[0 for _ in range(s)] for s in self.size_per_dim]
+
+        elif scheme == "adadelta":
+            # adadelta parameters
+            self.gamma = 0.1
+            self.offset = 0.0001
+            self.alpha = 1
+            self.g_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
+            self.s_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
+
+            # nesterov accelerated gradient
+            self.momentum = 0.9
+            self.delta_theta_t = [[np.zeros((self.D,)) for _ in range(s)] for s in self.size_per_dim]
+
+        elif scheme == "sgd":
+            self.rho = lambda t : 1./(t+1)
 
     def factorize(self):
         """
@@ -152,8 +182,43 @@ class H_SSVI_TF_2d():
         Compute the update for the mean parameter dependnig on the
         optimization scheme
         """
-        self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
-        return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
+        if self.opt_scheme == "adagrad":
+            self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
+            return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
+
+
+        elif self.opt_scheme == "schaul":
+            current_grad_pos = self.cur_gradient_pos[dim][i]
+            self.recent_gradients[dim][i][: , current_grad_pos] = mGrad
+            self.cur_gradient_pos[dim][i] = (self.cur_gradient_pos[dim][i] + 1) % self.window_size
+
+            recent_gradients         = self.recent_gradients[dim][i]
+            recent_gradients_squared = np.square(recent_gradients)
+            recent_gradients_sum     = np.sum(recent_gradients, 1)
+
+            expected_squares_gradient = np.sum(recent_gradients_squared, 1)
+
+            return self.eta / np.sqrt(expected_squares_gradient) * mGrad
+
+        elif self.opt_scheme == "adadelta":
+            g_0 = self.g_t[dim][i]
+            s_0 = self.s_t[dim][i]
+
+            # Update g_t
+            g_t = (1. - self.gamma) * np.square(mGrad) + self.gamma * g_0
+            self.g_t[dim][i] = g_t
+
+            # Compute gradient update
+            delta_theta_t = self.alpha * \
+                        np.divide(np.sqrt(np.add(s_0, self.offset)), \
+                                  np.sqrt(np.add(g_t, self.offset))) * mGrad
+
+            # Update s_t
+            self.s_t[dim][i] = (1 - self.gamma) * np.square(delta_theta_t) + self.gamma * s_0
+
+            # Update deltaTheta_t
+            self.delta_theta_t[dim][i] = delta_theta_t
+            return delta_theta_t
 
     def estimate_di_Di_normal(self, dim, i, coord, y, m, S):
         """

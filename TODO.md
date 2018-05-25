@@ -1,15 +1,16 @@
 
- 
-# Implement binary 
-- why is the decision rule m >= 1/2 and without using a link function
-- Start with distribution.py
-- Implement link function
+# Fix binary
+- different function for binary data synthesis 
+- how to synthesize fake binary data better?
 
 # implement poisson likelihood
 - How to do the expectation computation
+- Do laplace approximation
 
-# implements batch size capabilities
 
+# Numerical estimation of other likelihood?
+- 
+-
 
 
 
