@@ -113,10 +113,10 @@ class H_SSVI_TF_2d():
             coord  = entry[0]
             y      = entry[1]
 
-            # if self.likelihood_type == "normal":
-            #     (di_acc_update, Di_acc_update) = self.estimate_di_Di_normal(dim, i, coord, y, m, S)
-            # else:
-            (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
+            if self.likelihood_type == "normal":
+                (di_acc_update, Di_acc_update) = self.estimate_di_Di_normal(dim, i, coord, y, m, S)
+            else:
+                (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
 
             Di_acc += Di_acc_update
             di_acc += di_acc_update
@@ -155,7 +155,7 @@ class H_SSVI_TF_2d():
         self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
         return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
 
-    def estimate_di_Di_normal(self, dim, i, coord, y, m, S):
+    def estimate_di_Di_normal(self, dim, i, coord, y, mui, Sui):
         """
 
         :param dim:
@@ -176,22 +176,17 @@ class H_SSVI_TF_2d():
         otherdims     = alldims[:dim]
         otherdims.extend(alldims[dim + 1 : ])
 
-        di          = np.zeros((self.D, ))
-        Di          = np.zeros((self.D, self.D))
-
-
-        mean_acc   = np.ones((self.D,))
-        cov_acc    = np.ones((self.D, self.D))
+        d_acc = np.ones((self.D,))
+        D_acc = np.ones((self.D,self.D))
+        s = self.model.p_likelihood.params
 
         for j, d in enumerate(otherdims):
             m, S = self.model.q_posterior.find(d, othercols[j])
-            mean_acc   = np.multiply(mean_acc, m)
-            cov_acc    = np.inner(cov_acc, np.add(S, np.outer(m, m)))
+            d_acc = np.multiply(d_acc, m)
+            D_acc = np.multiply(D_acc, S + np.outer(m, m))
 
-        s    = self.model.p_likelihood.params
-        m, S = self.model.q_posterior.find(dim, i)
-        di   = y * np.divide(mean_acc, s) - np.inner(cov_acc ,np.divide(m, s))
-        Di   = -np.divide(cov_acc, s)
+        Di = -1./s * D_acc
+        di = y/s * d_acc - 1./s * np.inner(D_acc, mui)
         return di, Di
 
     def estimate_di_Di(self, dim, i, coord, y, m, S):
