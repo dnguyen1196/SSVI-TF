@@ -8,7 +8,7 @@ from Tensor.Tensor import tensor
 
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims     = [10, 10, 10, 10] # 10 * 10 * 10 tensor
+dims     = [50, 50, 10, 10] # 10 * 10 * 10 tensor
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 3, np.ones((hidden_D,)) * 2, np.ones((hidden_D,)) * 8]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2, np.eye(hidden_D) * 1]
@@ -42,9 +42,9 @@ model = SSVI_TF_d(p_likelihood, q_posterior, p_prior)
 
 ############################### FACTORIZATION ##########################
 
-rho_cov = lambda t: 0.01
+rho_cov = lambda t: 1/(1+t)
 k1 = 1
 k2 = 10
 
-factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, scheme="schaul")
+factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov)
 factorizer.factorize()

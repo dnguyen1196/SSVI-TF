@@ -113,10 +113,10 @@ class H_SSVI_TF_2d():
             coord  = entry[0]
             y      = entry[1]
 
-            if self.likelihood_type == "normal":
-                (di_acc_update, Di_acc_update) = self.estimate_di_Di_normal(dim, i, coord, y, m, S)
-            else:
-                (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
+            # if self.likelihood_type == "normal":
+            #     (di_acc_update, Di_acc_update) = self.estimate_di_Di_normal(dim, i, coord, y, m, S)
+            # else:
+            (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
 
             Di_acc += Di_acc_update
             di_acc += di_acc_update
@@ -319,11 +319,12 @@ class H_SSVI_TF_2d():
             return m
         elif self.likelihood_type == "poisson":
             f = self.link_fun(m)
-            #TODO: implement Laplace approximation
+            # TODO: implement Gauss-Hermite quadrature
+
 
             return 1
         elif self.likelihood_type == "bernoulli":
-            return 1 if self.link_fun(m) >= 1/2 else -1
+            return 1 if m >= 0 else -1
         else:
             raise Exception("Unidentified likelihood type")
 

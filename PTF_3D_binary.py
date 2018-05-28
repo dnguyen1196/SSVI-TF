@@ -6,7 +6,7 @@ from Tensor.Tensor import tensor
 
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims        = [50, 50, 50] # 100 * 100 * 100 tensor
+dims        = [100, 100, 100] # 100 * 100 * 100 tensor
 hidden_D    = 10
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
