@@ -11,6 +11,17 @@ class SSVI_TF_d(object):
         self.p_prior      = p_prior
 
 """
+SSVI_TF_GME
+Extension over SSVI_TF_d where we add another layer of Gaussian noise
+"""
+class SSVI_TF_GME(object):
+    def __init__(self, p_likelihood, q_posterior, p_prior, likelihood_type="normal"):
+        self.p_likelihood = p_likelihood
+        self.q_posterior  = q_posterior
+        self.p_prior      = p_prior
+
+
+"""
 Helper distribution class to keep track of a group of distributions
 """
 class distribution(object):

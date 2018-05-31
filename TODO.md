@@ -1,19 +1,15 @@
+# 
 
-# Fix binary
-- different function for binary data synthesis 
-- how to synthesize fake binary data better
 
 # implement poisson likelihood
 - How to do the expectation computation
 - Do laplace approximation
-
-
-# Check formula for tensor 
-- closed form formula for complete conditionals
-
+- 
 
 # Numerical estimation of other likelihood?
--  
+- For both poisson prediction and if we want to have closed form
+for Di and di, then we need to do that ugly formula to approximate
+the distribution over f_ijk
 - 
 
 

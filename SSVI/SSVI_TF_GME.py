@@ -1,18 +1,20 @@
 import Probability.ProbFun as probs
 import numpy as np
 from numpy.linalg import inv
-from numpy.linalg import norm
 import time
 
 """
-SSVI_TF.py
-SSVI algorithm to learn the hidden matrix factors behind tensor
-factorization
+SSVI_TF_GME.py
+
+An extension over the SSVI_TF_d model where we add another layer of noise
+Theoretically should provide a better results than SSVI_TF_d 
+
 """
 class H_SSVI_TF_2d():
     def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad", batch_size=5):
         """
-        :param model: the generative model behind factorization
+        :param model: the generative model behind factorization, must be
+                    SSVI_TF_d model
         :param tensor:
         :param rank:
         :param rho_cov: step size formula for covariance parameter
@@ -24,7 +26,7 @@ class H_SSVI_TF_2d():
         self.model      = model
         self.tensor     = tensor
         self.D          = rank
-        self.report     = 1000
+        self.report     = 1
 
         self.size_per_dim = tensor.dims        # dimension of the tensors
         self.order        = len(tensor.dims)   # number of dimensions
@@ -35,6 +37,9 @@ class H_SSVI_TF_2d():
         self.pSigma = [1 for _ in self.size_per_dim]
         self.likelihood_type = model.p_likelihood.type
 
+        # w parameter
+        self.w_sigma = 1
+        self.w_tau   = 1
 
         if self.likelihood_type == "normal":
             self.link_fun = lambda m : m
@@ -44,13 +49,11 @@ class H_SSVI_TF_2d():
             self.link_fun = lambda m : np.log(1 + np.exp(-m))
 
         # optimization scheme
-        self.opt_scheme = scheme
-
         self.time_step = [1 for _ in range(self.order)]
 
         # Stochastic optimization parameters
         self.batch_size  = batch_size
-        self.iterations  = 20000
+        self.iterations  = 6000
         self.k1          = k1
         self.k2          = k2
 
@@ -71,11 +74,10 @@ class H_SSVI_TF_2d():
         # while self.check_stop_cond():
         for iteration in range(self.iterations):
             current = time.time()
-            print("iteration: ", iteration, )
             if iteration != 0 and iteration % self.report == 0:
-                print (" - test error: ", \
-                       self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start, )
-            print()
+                print ("iteration: ", iteration, " - test error: ", \
+                       self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start)
+
             for dim in range(self.order):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
@@ -99,12 +101,10 @@ class H_SSVI_TF_2d():
         of dimension dim and column i
         """
         observed_i = self.tensor.find_observed_ui(dim, i)
-        # print(observed_i)
         if len(observed_i) > self.batch_size:
             observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
             observed_i   = np.take(observed_i, observed_idx, axis=0)
 
-        M = len(observed_i)
         (m, S) = self.model.q_posterior.find(dim, i)
 
         Di_acc = np.zeros((self.D, self.D))
@@ -114,10 +114,7 @@ class H_SSVI_TF_2d():
             coord  = entry[0]
             y      = entry[1]
 
-            if self.likelihood_type == "normal":
-                (di_acc_update, Di_acc_update) = self.estimate_di_Di_normal(dim, i, coord, y, m, S)
-            else:
-                (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
+            (di_acc_update, Di_acc_update) = self.estimate_di_Di_si(dim, i, coord, y, m, S)
 
             Di_acc += Di_acc_update
             di_acc += di_acc_update
@@ -132,13 +129,8 @@ class H_SSVI_TF_2d():
 
         # Update mean parameter
         meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-        if self.opt_scheme == "sgd":
-            m_update = self.rho(iteration) * meanGrad
-        else:
-            m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
 
-        m += m_update
-        # print(np.linalg.norm(m_update))
+        m += self.compute_update_mean_param(dim, i, m, meanGrad)
         self.model.q_posterior.update(dim, i, (m, S))
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
@@ -149,14 +141,11 @@ class H_SSVI_TF_2d():
         :param m: current value of mean parameter
         :param mGrad: computed gradient
         :return:
-
-        Compute the update for the mean parameter dependnig on the
-        optimization scheme
         """
         self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
         return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
 
-    def estimate_di_Di_normal(self, dim, i, coord, y, mui, Sui):
+    def estimate_di_Di_complete_conditional(self, dim, i, coord, y, mui, Sui):
         """
 
         :param dim:
@@ -190,7 +179,7 @@ class H_SSVI_TF_2d():
         di = y/s * d_acc - 1./s * np.inner(D_acc, mui)
         return di, Di
 
-    def estimate_di_Di(self, dim, i, coord, y, m, S):
+    def estimate_di_Di_si(self, dim, i, coord, y, m, S):
         """
         :param dim:
         :param i:
@@ -214,12 +203,13 @@ class H_SSVI_TF_2d():
 
         for k1 in range(self.k1):
             ui = self.sample_uis(othercols, otherdims)
+            alpha = np.random.rayleigh(self.w_sigma)
 
             meanf     = np.dot(ui, m)
             covS     = np.dot(ui, np.inner(S, ui))
 
             Expected_fst_derivative, Expected_snd_derivative = \
-                self.compute_expected_first_snd_derivative(y, meanf, covS)
+                self.compute_expected_derivatives(y, meanf, covS, alpha)
 
             di += ui * Expected_fst_derivative/self.k1                   # Update di
             Di += np.outer(ui, ui) * Expected_snd_derivative/(2*self.k1) # Update Di
@@ -238,7 +228,7 @@ class H_SSVI_TF_2d():
             sigma += np.trace(S) + np.dot(m, m)
         self.pSigma[dim] = sigma/(M*self.D)
 
-    def compute_expected_first_snd_derivative(self, y, meanf, covS) :
+    def compute_expected_derivatives(self, y, meanf, covS, alpha) :
         first_derivative = 0.0
         snd_derivative = 0.0
         s = self.model.p_likelihood.params
