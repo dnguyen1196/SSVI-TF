@@ -50,7 +50,7 @@ class H_SSVI_TF_2d():
 
         # Stochastic optimization parameters
         self.batch_size  = batch_size
-        self.iterations  = 60000
+        self.iterations  = 60001
         self.k1          = k1
         self.k2          = k2
 

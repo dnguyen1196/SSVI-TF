@@ -10,7 +10,7 @@ An extension over the SSVI_TF_d model where we add another layer of noise
 Theoretically should provide a better results than SSVI_TF_d 
 
 """
-class H_SSVI_TF_2d():
+class H_SSVI_TF():
     def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad", batch_size=5):
         """
         :param model: the generative model behind factorization, must be
@@ -26,7 +26,7 @@ class H_SSVI_TF_2d():
         self.model      = model
         self.tensor     = tensor
         self.D          = rank
-        self.report     = 1
+        self.report     = 1000
 
         self.size_per_dim = tensor.dims        # dimension of the tensors
         self.order        = len(tensor.dims)   # number of dimensions
@@ -38,8 +38,8 @@ class H_SSVI_TF_2d():
         self.likelihood_type = model.p_likelihood.type
 
         # w parameter
-        self.w_sigma = 1
-        self.w_tau   = 1
+        self.w_sigma = 1.
+        self.w_tau   = 1.
 
         if self.likelihood_type == "normal":
             self.link_fun = lambda m : m
@@ -53,7 +53,7 @@ class H_SSVI_TF_2d():
 
         # Stochastic optimization parameters
         self.batch_size  = batch_size
-        self.iterations  = 6000
+        self.iterations  = 60001
         self.k1          = k1
         self.k2          = k2
 
@@ -109,29 +109,40 @@ class H_SSVI_TF_2d():
 
         Di_acc = np.zeros((self.D, self.D))
         di_acc = np.zeros((self.D, ))
+        si_acc = 0.
 
         for entry in observed_i:
             coord  = entry[0]
             y      = entry[1]
 
-            (di_acc_update, Di_acc_update) = self.estimate_di_Di_si(dim, i, coord, y, m, S)
+            (di_acc_update, Di_acc_update, si_acc_update) = self.estimate_di_Di_si(dim, i, coord, y, m, S)
 
             Di_acc += Di_acc_update
             di_acc += di_acc_update
+            si_acc += si_acc_update
 
         Di_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
         di_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
+        si_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
+
+        # Get the decreasing step size
+        step_size = self.rho_cov(iteration)
 
         # Update covariance parameter
-        rhoS = self.rho_cov(iteration)
         covGrad = (1./self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
-        S = inv((1-rhoS) * inv(S) + rhoS * covGrad)
+        S = inv((1-step_size) * inv(S) + step_size * covGrad)
 
         # Update mean parameter
         meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-
         m += self.compute_update_mean_param(dim, i, m, meanGrad)
+
+        # Update w parameter
+        w_grad = 2 * self.w_tau**2 + si_acc
+        self.w_sigma = ((1 - step_size) * 2 * self.w_sigma**2 + step_size * w_grad)/2
+
+        # Store the update in memory
         self.model.q_posterior.update(dim, i, (m, S))
+
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
         """
@@ -200,6 +211,7 @@ class H_SSVI_TF_2d():
 
         di          = np.zeros((self.D, ))
         Di          = np.zeros((self.D, self.D))
+        si          = 0.0
 
         for k1 in range(self.k1):
             ui = self.sample_uis(othercols, otherdims)
@@ -213,8 +225,9 @@ class H_SSVI_TF_2d():
 
             di += ui * Expected_fst_derivative/self.k1                   # Update di
             Di += np.outer(ui, ui) * Expected_snd_derivative/(2*self.k1) # Update Di
+            si += alpha / (8 * self.w_sigma) * Expected_snd_derivative/ self.k1
 
-        return di, Di
+        return di, Di, si
 
     def update_hyper_parameter(self, dim, iteration):
         """
@@ -234,7 +247,7 @@ class H_SSVI_TF_2d():
         s = self.model.p_likelihood.params
 
         for k2 in range(self.k2):
-            f = probs.sample("normal", (meanf, covS))
+            f = probs.sample("normal", (meanf, covS + alpha))
             snd_derivative += probs.snd_derivative(self.likelihood_type, (y, f, s))
             first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
 
