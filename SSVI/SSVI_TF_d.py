@@ -50,7 +50,7 @@ class H_SSVI_TF_2d():
 
         # Stochastic optimization parameters
         self.batch_size  = batch_size
-        self.iterations  = 20000
+        self.iterations  = 60000
         self.k1          = k1
         self.k2          = k2
 
@@ -71,11 +71,9 @@ class H_SSVI_TF_2d():
         # while self.check_stop_cond():
         for iteration in range(self.iterations):
             current = time.time()
-            print("iteration: ", iteration, )
             if iteration != 0 and iteration % self.report == 0:
-                print (" - test error: ", \
-                       self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start, )
-            print()
+                print ("iteration: ", iteration, " - test error: ", \
+                       self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start)
             for dim in range(self.order):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
