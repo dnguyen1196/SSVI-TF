@@ -9,7 +9,6 @@ import time
 class tensor(object):
     def  __init__(self, datatype="real", binary_cutoff=0.0):
         """
-
         :param datatype:
         :param binary_cutoff:
         """
@@ -22,7 +21,9 @@ class tensor(object):
             self.link_fun = lambda m : 1. / (1. + np.exp(-m))
             self.binary_cutoff = binary_cutoff
         elif self.datatype == "count":
-            self.link_fun = lambda m : np.log(1 + np.exp(-m))
+            self.max_count = 0
+            self.min_count = 100
+            self.link_fun = lambda m : np.log(1 + np.exp(m))
 
     # synthesize data according to some model
     def synthesize(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
@@ -132,6 +133,46 @@ class tensor(object):
         end = time.time()
         print("Generating synthetic data took: ", end- start)
 
+    def synthesize_count_data(self, dims, D, train, sparsity):
+        """
+
+        :param dims:
+        :param D:
+        :param train:
+        :param sparsity:
+        :return:
+        """
+        print("Generating synthetic data ... ")
+        start = time.time()
+        self.dims = dims
+
+        ndim = len(dims)
+        matrices = [[]] * ndim
+
+        mean_array = np.linspace(-1, 1, ndim)
+        # Generate the random hidden matrices
+        for i in range(ndim):
+            mean = np.ones((D,)) * mean_array[i]
+            cov  = np.eye(D)     * 0.1
+            matrices[i] = self.create_matrix_binary(dims[i], D, mean, cov)
+
+        total         = np.prod(dims) # Total number of possible entries
+        observed_num  = int(total * sparsity) # Number of observed_by_id entries
+        train_size    = int(observed_num * train) # training set size
+
+        observed_entries, observed_vals \
+            = self.organize_observed_entries(observed_num, train_size, dims, matrices)
+
+        self.test_entries  = observed_entries[train_size :]
+        self.test_vals     = observed_vals[train_size :]
+        self.train_entries = observed_entries[: train_size]
+        self.train_vals    = observed_vals[: train_size]
+
+        end = time.time()
+        print("Generating synthetic data took: ", end- start)
+        print("max count is: ", self.max_count)
+
+
     def create_matrix_binary(self, nrow, ncol, m, S):
         """
         :param nrow:
@@ -164,8 +205,6 @@ class tensor(object):
 
             m = np.sum(ui)
             f = self.actual_value(m)
-            if self.datatype == "binary":
-                assert(f * (m- self.binary_cutoff) > 0)
 
             observed_vals[entry_num] = f
             if entry_num < train_size:
@@ -180,8 +219,14 @@ class tensor(object):
             return m
         elif self.datatype == "binary":
             return 1 if m >= self.binary_cutoff else -1
+        elif self.datatype == "count":
+            f = self.link_fun(m)
+            x = np.random.poisson(f)
+            self.max_count = max(self.max_count, x)
+            self.min_count = min(self.min_count, x)
+            return x
         else:
-            return None
+            return 0
 
     def create_matrix(self, nrow, ncol, m, S):
         """

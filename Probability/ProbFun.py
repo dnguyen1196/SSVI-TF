@@ -8,22 +8,35 @@ warnings.filterwarnings("error")
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
+offset = .00000001
+
 def sigmoid(x):
     try:
         res = 1./(1 + np.exp(-x))
         return res
     except Warning:
         if x < 0:
-            return 0.00000001
+            return offset
         else:
-            return 0.99999999
+            return 1 - offset
+
+def poisson_link(f):
+    try:
+        res = np.log(1 + np.exp(f))
+        if res < offset:
+            return offset
+        else:
+            return res
+
+    except Warning:
+        return f
 
 def sigmoid_overflow(x):
     try:
         res = 1./(1 + np.exp(-x))
         return res
     except Warning:
-        return 0.00001
+        return offset
 
 """
 Normal distribution
@@ -57,17 +70,27 @@ def bernoulli_snd_derivative(y, f, s=None):
 """
 Poisson distribution (count-valued tensor)
 """
-def poisson_sample(f):
+def poisson_sample(f, s=None):
     return np.random.poisson(lam=f)
 
-def poisson_fst_derivative(y, f):
-    s = min(0, f)
-    p = sigmoid(f)
-    return (y+1)/2-p
+# The commented out functions below work with
+# link function as e^f
+# def poisson_fst_derivative(y, f, s=None):
+#     s = min(0, f)
+#     p = sigmoid(f)
+#     return (y+1)/2-p
+#
+# def poisson_snd_derivative(y, f, s=None):
+#     s = min(0, f)
+#     return -np.exp(2*s-f)/np.square(np.exp(s)+np.exp(s-f))
 
-def poisson_snd_derivative(y, f):
-    s = min(0, f)
-    return -np.exp(2*s-f)/np.square(np.exp(s)+np.exp(s-f))
+def poisson_fst_derivative(y, f, s=None):
+    return sigmoid(f) * (y / poisson_link(f) - 1)
+
+def poisson_snd_derivative(y, f, s=None):
+    temp1 = sigmoid(f) * (1-sigmoid(f)) * (y / poisson_link(f) - 1)
+    temp2 = np.square(sigmoid(f))/np.square(poisson_link(f))*y
+    return temp1 + temp2
 
 """
 MultiNormal distribution

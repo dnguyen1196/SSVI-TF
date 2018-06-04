@@ -2,6 +2,7 @@ import Probability.ProbFun as probs
 import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import norm
+import math
 import time
 
 """
@@ -24,7 +25,6 @@ class H_SSVI_TF_2d():
         self.model      = model
         self.tensor     = tensor
         self.D          = rank
-        self.report     = 1000
 
         self.size_per_dim = tensor.dims        # dimension of the tensors
         self.order        = len(tensor.dims)   # number of dimensions
@@ -35,17 +35,19 @@ class H_SSVI_TF_2d():
         self.pSigma = [1 for _ in self.size_per_dim]
         self.likelihood_type = model.p_likelihood.type
 
-
         if self.likelihood_type == "normal":
             self.link_fun = lambda m : m
         elif self.likelihood_type == "bernoulli":
             self.link_fun = lambda m : probs.sigmoid(m)
         elif self.likelihood_type == "poisson":
-            self.link_fun = lambda m : np.log(1 + np.exp(-m))
+            self.max_count   = tensor.max_count
+            self.min_count   = tensor.min_count
+            self.herm_degree = 20
+            self.hermite_points, self.hermite_weights = np.polynomial.hermite.hermgauss(self.herm_degree)
+            self.link_fun = lambda m : probs.poisson_link(m)
 
         # optimization scheme
         self.opt_scheme = scheme
-
         self.time_step = [1 for _ in range(self.order)]
 
         # Stochastic optimization parameters
@@ -55,11 +57,13 @@ class H_SSVI_TF_2d():
         self.k2          = k2
 
         # adagrad parameters
-        self.offset = 0.0001
+        self.offset = 0.000000001
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
+        self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.size_per_dim]
         self.eta = 1
 
-    def factorize(self):
+    def factorize(self, report=1000):
+        self.report = report
         """
         factorize
         :return: None
@@ -74,6 +78,7 @@ class H_SSVI_TF_2d():
             if iteration != 0 and iteration % self.report == 0:
                 print ("iteration: ", iteration, " - test error: ", \
                        self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start)
+
             for dim in range(self.order):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
@@ -97,7 +102,6 @@ class H_SSVI_TF_2d():
         of dimension dim and column i
         """
         observed_i = self.tensor.find_observed_ui(dim, i)
-        # print(observed_i)
         if len(observed_i) > self.batch_size:
             observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
             observed_i   = np.take(observed_i, observed_idx, axis=0)
@@ -113,7 +117,7 @@ class H_SSVI_TF_2d():
             y      = entry[1]
 
             if self.likelihood_type == "normal":
-                (di_acc_update, Di_acc_update) = self.estimate_di_Di_normal(dim, i, coord, y, m, S)
+                (di_acc_update, Di_acc_update) = self.estimate_di_Di_complete_conditional(dim, i, coord, y, m, S)
             else:
                 (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
 
@@ -126,18 +130,24 @@ class H_SSVI_TF_2d():
         # Update covariance parameter
         rhoS = self.rho_cov(iteration)
         covGrad = (1./self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
-        S = inv((1-rhoS) * inv(S) + rhoS * covGrad)
+        covUpdate = self.compute_update_cov_param(dim, i, m, covGrad)
+
+        # print(np.linalg.norm(covUpdate, ord='fro'))
+
+        S = inv((1-rhoS) * inv(S) + rhoS * covUpdate)
 
         # Update mean parameter
         meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-        if self.opt_scheme == "sgd":
-            m_update = self.rho(iteration) * meanGrad
-        else:
-            m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
+        m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
 
         m += m_update
-        # print(np.linalg.norm(m_update))
         self.model.q_posterior.update(dim, i, (m, S))
+
+    def compute_update_cov_param(self, dim, i, m, covGrad):
+        acc_grad = self.ada_acc_cov[dim][:, :, i]
+        grad_squared = np.multiply(covGrad, covGrad)
+        self.ada_acc_cov[dim][:, :, i] += grad_squared
+        return np.multiply(np.divide(covGrad, np.sqrt(np.add(acc_grad, grad_squared))), self.eta*0.001)
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
         """
@@ -151,12 +161,13 @@ class H_SSVI_TF_2d():
         Compute the update for the mean parameter dependnig on the
         optimization scheme
         """
-        self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
-        return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
+        acc_grad = self.ada_acc_grad[dim][:, i]
+        grad_sqr = np.multiply(mGrad, mGrad)
+        self.ada_acc_grad[dim][:, i] += grad_sqr
+        return np.multiply(mGrad, self.eta / np.sqrt(np.add(acc_grad, grad_sqr)))
 
-    def estimate_di_Di_normal(self, dim, i, coord, y, mui, Sui):
+    def estimate_di_Di_complete_conditional(self, dim, i, coord, y, mui, Sui):
         """
-
         :param dim:
         :param i:
         :param coord:
@@ -284,6 +295,8 @@ class H_SSVI_TF_2d():
                 error += np.abs(predict - correct)/abs(correct)
             elif self.likelihood_type == "bernoulli":
                 error += 1 if predict != correct else 0
+            elif self.likelihood_type == "poisson":
+                error += np.abs(predict - correct)
             else:
                 return 0
 
@@ -301,9 +314,9 @@ class H_SSVI_TF_2d():
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
             elif self.likelihood_type == "bernoulli":
-                # if predict != correct:
-                #     print ("errror: ", predict, correct)
                 error += 1 if predict != correct else 0
+            elif self.likelihood_type == "poisson":
+                error += np.abs(predict - correct)
             else:
                 return 0
         return error/len(self.tensor.test_vals)
@@ -311,33 +324,89 @@ class H_SSVI_TF_2d():
     def predict_y_given_m(self, m):
         if self.likelihood_type == "normal":
             return m
-        elif self.likelihood_type == "poisson":
-            f = self.link_fun(m)
-            # TODO: implement Gauss-Hermite quadrature
-
-
-            return 1
         elif self.likelihood_type == "bernoulli":
             return 1 if m >= 0 else -1
         else:
             raise Exception("Unidentified likelihood type")
 
-    def compute_expected_count(self, hermite_weights):
+    def compute_fyi(self, k, yi, m, s):
+        temp1 = np.power(self.link_fun(np.sqrt(2 * s) * yi + m),k)/math.factorial(k)
+        temp2 = -self.link_fun(np.sqrt(2 * s) * yi + m)
+        temp3 = np.exp(temp2 * np.sqrt(2 * s))
+        if temp3 < self.offset:
+            return temp1 * self.offset
+        return temp1 * temp3
+
+    def compute_gauss_hermite(self, k, m, S):
+        res = 0.
+        for i in range(len(self.hermite_points)):
+            yi = self.hermite_points[i]
+            weight = self.hermite_weights[i]
+            res += weight * self.compute_fyi(k, yi, m, S)
+        return res / np.sqrt(2* np.pi * S)
+
+    def compute_posterior_param(self, entry):
+        n = len(entry)
+        ms = np.ones((self.D,))
+        all_ms = np.ones((self.D, n))
+
+        Cs = np.ones((self.D, self.D))
+        all_Cs = np.ones((self.D, self.D, n))
+
+        for dim, col in enumerate(entry):
+            m, C = self.model.q_posterior.find(dim, col)
+            all_ms[:, dim] = m
+            all_Cs[:, :, dim] = C
+            ms = np.multiply(ms, m)
+            Cs = np.multiply(Cs, C)
+
+        m = np.sum(ms)
+        S = np.sum(Cs)
+        for dim in range(len(entry)):
+            mi = all_ms[:, dim]
+            Ci = all_Cs[:, :, dim]
+
+            other_m = np.divide(ms, mi)
+            other_C = np.divide(Cs, Ci, out=np.zeros_like(Cs), where=Ci!=0)
 
 
-        return
+            S += np.inner(np.transpose(other_m), np.inner(Ci, other_m))
+            S += np.inner(np.transpose(mi), np.inner(other_C, mi))
 
-    def compute_gauss_hermite(self, f, n):
+        return m, S
 
-        return
+    def compute_expected_count(self, m, S):
+        num = self.max_count - self.min_count + 1
+        probs = np.zeros((num, ))
+        sum_probs = 0.
+
+        k_array   = list(range(self.min_count, self.max_count + 1))
+
+        for i, k in enumerate(k_array):
+            prob = self.compute_gauss_hermite(k, m, S)
+            probs[i]   = prob
+            sum_probs += probs[i]
+
+        return np.sum(np.multiply(probs, np.array(k_array)))/sum_probs
 
     def predict_entry(self, entry):
-        u = np.ones((self.D,))
-        for dim, col in enumerate(entry):
-            m, S = self.model.q_posterior.find(dim, col)
-            u = np.multiply(u, m)
-        m = np.sum(u)
-        return self.predict_y_given_m(m)
+        # If not count-valued tensor
+        if self.likelihood_type != "poisson":
+            u = np.ones((self.D,))
+            for dim, col in enumerate(entry):
+                m, _ = self.model.q_posterior.find(dim, col)
+                u = np.multiply(u, m)
+            m = np.sum(u)
+            return self.predict_y_given_m(m)
+        else:
+            # if predicting count values, the calculations are more involved
+            # as we first need find the parameters of the posterior distribution
+            m, S = self.compute_posterior_param(entry)
+            return self.compute_expected_count(m, S)
+
+
+
+
 
 
 
