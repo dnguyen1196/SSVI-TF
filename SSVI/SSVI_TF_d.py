@@ -131,17 +131,15 @@ class H_SSVI_TF_2d():
         # Update covariance parameter
         rhoS = self.rho_cov(iteration)
         covGrad = (1. / self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
-        S = inv((1 - rhoS) * inv(S) + rhoS * covGrad)
+        covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+
+        # S = inv((1 - rhoS) * inv(S) + rhoS * covGrad)
+        S = inv((np.ones_like(covGrad) - covStep) * inv(S) + np.multiply(covStep, covGrad))
 
         # Update mean parameter
         meanGrad = (np.inner(1. / self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-
-        if self.opt_scheme == "sgd":
-            m_update = self.rho(iteration) * meanGrad
-        else:
-            m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
-
-        m += m_update
+        meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+        m += np.multiply(meanStep, meanGrad)
         self.model.q_posterior.update(dim, i, (m, S))
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
@@ -159,7 +157,7 @@ class H_SSVI_TF_2d():
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
         if self.likelihood_type == "bernoulli":
-            return 0.01 * np.ones_like(covGrad)
+            return 0.01
 
         acc_grad = self.ada_acc_cov[dim][:, :, i]
         grad_squared = np.multiply(covGrad, covGrad)
