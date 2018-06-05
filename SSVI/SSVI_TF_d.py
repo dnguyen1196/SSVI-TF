@@ -57,10 +57,11 @@ class H_SSVI_TF_2d():
         self.k2          = k2
 
         # adagrad parameters
-        self.offset = 0.000000001
+        self.offset = 0.000001
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
         self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.size_per_dim]
         self.eta = 1
+        self.poisson_eta = 0.0005
 
     def factorize(self, report=1000):
         self.report = report
@@ -142,27 +143,14 @@ class H_SSVI_TF_2d():
         m += np.multiply(meanStep, meanGrad)
         self.model.q_posterior.update(dim, i, (m, S))
 
-    def compute_update_mean_param(self, dim, i, m, mGrad):
-        """
-        :param dim: dimension of the hidden matrix
-        :param i: column of hidden matrix
-        :param m: current value of mean parameter
-        :param mGrad: computed gradient
-        :return:
-        Compute the update for the mean parameter dependnig on the
-        optimization scheme
-        """
-        self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
-        return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
-
     def compute_stepsize_cov_param(self, dim, i, covGrad):
-        if self.likelihood_type == "bernoulli":
+        if self.likelihood_type != "poisson":
             return 0.01
 
         acc_grad = self.ada_acc_cov[dim][:, :, i]
-        grad_squared = np.multiply(covGrad, covGrad)
+        grad_squared = np.square(covGrad)
         self.ada_acc_cov[dim][:, :, i] += grad_squared
-        return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_squared)))
+        return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_squared)))
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
         """
@@ -175,9 +163,12 @@ class H_SSVI_TF_2d():
         optimization scheme
         """
         acc_grad = self.ada_acc_grad[dim][:, i]
-        grad_sqr = np.multiply(mGrad, mGrad)
+        grad_sqr = np.square(mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
-        return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        if self.likelihood_type != "poisson":
+            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        else:
+            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
 
     def estimate_di_Di_complete_conditional(self, dim, i, coord, y, mui, Sui):
         """
