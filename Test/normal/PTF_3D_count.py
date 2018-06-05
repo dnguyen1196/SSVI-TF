@@ -4,16 +4,16 @@ from Model.TF_Models import SSVI_TF_d, distribution
 from SSVI.SSVI_TF_d import H_SSVI_TF_2d
 from Tensor.Tensor import tensor
 
-np.random.seed(seed=317) # For control and comparisons
+# np.random.seed(seed=317) # For control and comparisons
 # Generate synthesize tensor, true, this is what we try to recover
 
-dims     = [100, 100, 100] # 10 * 10 * 10 tensor
+dims     = [10, 10, 10]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
 
 data = tensor(datatype="count")
-data.synthesize_count_data(dims, hidden_D, 0.8, 1)
+data.synthesize_count_data(dims, hidden_D, 0.8, 0.1)
 
 
 ################## MODEL and FACTORIZATION #########################

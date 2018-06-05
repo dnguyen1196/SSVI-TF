@@ -6,7 +6,7 @@ from Tensor.Tensor import tensor
 
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims        = [100, 100, 100] # 100 * 100 * 100 tensor
+dims        = [50, 50, 50]
 hidden_D    = 10
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
@@ -36,4 +36,4 @@ model = SSVI_TF_d(p_likelihood, q_posterior, p_prior, likelihood_type="bernoulli
 ############################### FACTORIZATION ##########################
 rho_cov = lambda t : 0.01
 factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, k1=10, k2=10)
-factorizer.factorize()
+factorizer.factorize(report=100)

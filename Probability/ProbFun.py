@@ -8,7 +8,7 @@ warnings.filterwarnings("error")
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
-offset = .00000001
+offset = 0.00000001
 
 def sigmoid(x):
     try:
@@ -71,18 +71,7 @@ def bernoulli_snd_derivative(y, f, s=None):
 Poisson distribution (count-valued tensor)
 """
 def poisson_sample(f, s=None):
-    return np.random.poisson(lam=f)
-
-# The commented out functions below work with
-# link function as e^f
-# def poisson_fst_derivative(y, f, s=None):
-#     s = min(0, f)
-#     p = sigmoid(f)
-#     return (y+1)/2-p
-#
-# def poisson_snd_derivative(y, f, s=None):
-#     s = min(0, f)
-#     return -np.exp(2*s-f)/np.square(np.exp(s)+np.exp(s-f))
+    return np.random.poisson(f)
 
 def poisson_fst_derivative(y, f, s=None):
     return sigmoid(f) * (y / poisson_link(f) - 1)

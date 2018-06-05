@@ -7,7 +7,7 @@ from Tensor.Tensor import tensor
 # np.random.seed(seed=317) # For control and comparisons
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims     = [100, 100, 100] # 10 * 10 * 10 tensor
+dims     = [100, 100, 100]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]

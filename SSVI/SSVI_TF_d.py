@@ -102,19 +102,20 @@ class H_SSVI_TF_2d():
         of dimension dim and column i
         """
         observed_i = self.tensor.find_observed_ui(dim, i)
+        # print(observed_i)
         if len(observed_i) > self.batch_size:
             observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
-            observed_i   = np.take(observed_i, observed_idx, axis=0)
+            observed_i = np.take(observed_i, observed_idx, axis=0)
 
         M = len(observed_i)
         (m, S) = self.model.q_posterior.find(dim, i)
 
         Di_acc = np.zeros((self.D, self.D))
-        di_acc = np.zeros((self.D, ))
+        di_acc = np.zeros((self.D,))
 
         for entry in observed_i:
-            coord  = entry[0]
-            y      = entry[1]
+            coord = entry[0]
+            y = entry[1]
 
             if self.likelihood_type == "normal":
                 (di_acc_update, Di_acc_update) = self.estimate_di_Di_complete_conditional(dim, i, coord, y, m, S)
@@ -124,37 +125,51 @@ class H_SSVI_TF_2d():
             Di_acc += Di_acc_update
             di_acc += di_acc_update
 
-        Di_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
-        di_acc *= len(observed_i)/ min(self.batch_size, len(observed_i))
+        Di_acc *= len(observed_i) / min(self.batch_size, len(observed_i))
+        di_acc *= len(observed_i) / min(self.batch_size, len(observed_i))
 
         # Update covariance parameter
         rhoS = self.rho_cov(iteration)
-        covGrad = (1./self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
-        covUpdate = self.compute_update_cov_param(dim, i, m, covGrad)
-
-        # print(np.linalg.norm(covUpdate, ord='fro'))
-
-        S = inv((1-rhoS) * inv(S) + rhoS * covUpdate)
+        covGrad = (1. / self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
+        S = inv((1 - rhoS) * inv(S) + rhoS * covGrad)
 
         # Update mean parameter
-        meanGrad = (np.inner(1./self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-        m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
+        meanGrad = (np.inner(1. / self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
+
+        if self.opt_scheme == "sgd":
+            m_update = self.rho(iteration) * meanGrad
+        else:
+            m_update = self.compute_update_mean_param(dim, i, m, meanGrad)
 
         m += m_update
         self.model.q_posterior.update(dim, i, (m, S))
 
-    def compute_update_cov_param(self, dim, i, m, covGrad):
-        acc_grad = self.ada_acc_cov[dim][:, :, i]
-        grad_squared = np.multiply(covGrad, covGrad)
-        self.ada_acc_cov[dim][:, :, i] += grad_squared
-        return np.multiply(np.divide(covGrad, np.sqrt(np.add(acc_grad, grad_squared))), self.eta*0.001)
-
     def compute_update_mean_param(self, dim, i, m, mGrad):
         """
-
         :param dim: dimension of the hidden matrix
         :param i: column of hidden matrix
         :param m: current value of mean parameter
+        :param mGrad: computed gradient
+        :return:
+        Compute the update for the mean parameter dependnig on the
+        optimization scheme
+        """
+        self.ada_acc_grad[dim][:, i] += np.multiply(mGrad, mGrad)
+        return self.eta / np.sqrt(self.ada_acc_grad[dim][:, i]) * mGrad
+
+    def compute_stepsize_cov_param(self, dim, i, covGrad):
+        if self.likelihood_type == "bernoulli":
+            return 0.01 * np.ones_like(covGrad)
+
+        acc_grad = self.ada_acc_cov[dim][:, :, i]
+        grad_squared = np.multiply(covGrad, covGrad)
+        self.ada_acc_cov[dim][:, :, i] += grad_squared
+        return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_squared)))
+
+    def compute_stepsize_mean_param(self, dim, i, mGrad):
+        """
+        :param dim: dimension of the hidden matrix
+        :param i: column of hidden matrix
         :param mGrad: computed gradient
         :return:
 
@@ -164,7 +179,7 @@ class H_SSVI_TF_2d():
         acc_grad = self.ada_acc_grad[dim][:, i]
         grad_sqr = np.multiply(mGrad, mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
-        return np.multiply(mGrad, self.eta / np.sqrt(np.add(acc_grad, grad_sqr)))
+        return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
 
     def estimate_di_Di_complete_conditional(self, dim, i, coord, y, mui, Sui):
         """
@@ -291,6 +306,9 @@ class H_SSVI_TF_2d():
         for i, entry in enumerate(self.tensor.train_entries):
             predict = self.predict_entry(entry)
             correct = self.tensor.train_vals[i]
+
+            # print(predict, " vs ", correct)
+
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
             elif self.likelihood_type == "bernoulli":
