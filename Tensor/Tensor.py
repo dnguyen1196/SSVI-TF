@@ -45,7 +45,7 @@ class tensor(object):
         matrices = [[]] * ndim
         # Generate the random hidden matrices
         for i in range(ndim):
-            matrices[i] = self.create_matrix(dims[i], D, means[i], covariances[i])
+            matrices[i] = self.create_random_matrix(dims[i], D, means[i], covariances[i])
 
         total         = np.prod(dims) # Total number of possible entries
         observed_num  = int(total * sparsity) # Number of observed_by_id entries
@@ -86,7 +86,7 @@ class tensor(object):
         matrices = [[]] * ndim
         # Generate the random hidden matrices
         for i in range(ndim):
-            matrices[i] = self.create_matrix(dims[i], D, means[i], covariances[i])
+            matrices[i] = self.create_random_matrix(dims[i], D, means[i], covariances[i])
 
         total         = np.prod(dims) # Total number of possible entries
         observed_num  = int(total * sparsity) # Number of observed_by_id entries
@@ -116,7 +116,7 @@ class tensor(object):
         for i in range(ndim):
             mean = np.ones((D,)) * mean_array[i]
             cov  = np.eye(D)     * 0.1
-            matrices[i] = self.create_matrix_binary(dims[i], D, mean, cov)
+            matrices[i] = self.create_random_matrix(dims[i], D, mean, cov)
 
         total         = np.prod(dims) # Total number of possible entries
         observed_num  = int(total * sparsity) # Number of observed_by_id entries
@@ -149,12 +149,12 @@ class tensor(object):
         ndim = len(dims)
         matrices = [[]] * ndim
 
-        mean_array = np.linspace(-1, 1, ndim)
+        mean_array = np.linspace(-2, 2, ndim)
         # Generate the random hidden matrices
         for i in range(ndim):
             mean = np.ones((D,)) * mean_array[i]
             cov  = np.eye(D)     * 0.1
-            matrices[i] = self.create_matrix_binary(dims[i], D, mean, cov)
+            matrices[i] = self.create_random_matrix(dims[i], D, mean, cov)
 
         total         = np.prod(dims) # Total number of possible entries
         observed_num  = int(total * sparsity) # Number of observed_by_id entries
@@ -173,7 +173,7 @@ class tensor(object):
         print("max count is: ", self.max_count)
 
 
-    def create_matrix_binary(self, nrow, ncol, m, S):
+    def create_random_matrix(self, nrow, ncol, m, S):
         """
         :param nrow:
         :param ncol:
@@ -221,27 +221,15 @@ class tensor(object):
             return 1 if m >= self.binary_cutoff else -1
         elif self.datatype == "count":
             f = self.link_fun(m)
-            x = np.random.poisson(f)
+            # x = np.random.poisson(f)
+            x = int(np.rint(f))
+            # print(f, x)
+
             self.max_count = max(self.max_count, x)
             self.min_count = min(self.min_count, x)
             return x
         else:
             return 0
-
-    def create_matrix(self, nrow, ncol, m, S):
-        """
-        :param nrow:
-        :param ncol:
-        :param m:
-        :param S:
-        :return:
-        """
-        matrix = np.zeros((nrow, ncol))
-        for i in range(nrow):
-            # Populate each row with a random vector generated from mean m,
-            # and covariance S
-            matrix[i, :] = np.random.multivariate_normal(m, S)
-        return matrix
 
     def find_observed_ui(self, dim, i):
         """

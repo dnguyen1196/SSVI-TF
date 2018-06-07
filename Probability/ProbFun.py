@@ -8,7 +8,7 @@ warnings.filterwarnings("error")
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
-offset = 0.00000001
+epsilon = 0.00000001
 
 def sigmoid(x):
     try:
@@ -16,27 +16,20 @@ def sigmoid(x):
         return res
     except Warning:
         if x < 0:
-            return offset
+            return epsilon
         else:
-            return 1 - offset
+            return 1 - epsilon
+
+def poisson_link_no_exception(f):
+    return np.log(1 + np.exp(f))
 
 def poisson_link(f):
     try:
         res = np.log(1 + np.exp(f))
-        if res < offset:
-            return offset
-        else:
-            return res
-
+        return max(res, epsilon)
     except Warning:
         return f
 
-def sigmoid_overflow(x):
-    try:
-        res = 1./(1 + np.exp(-x))
-        return res
-    except Warning:
-        return offset
 
 """
 Normal distribution
@@ -74,12 +67,18 @@ def poisson_sample(f, s=None):
     return np.random.poisson(f)
 
 def poisson_fst_derivative(y, f, s=None):
-    return sigmoid(f) * (y / poisson_link(f) - 1)
+    sigma = sigmoid(f)
+    A     = poisson_link(f)
+    res   = sigma * (np.divide(y, A) - 1)
+    return res
 
 def poisson_snd_derivative(y, f, s=None):
-    temp1 = sigmoid(f) * (1-sigmoid(f)) * (y / poisson_link(f) - 1)
-    temp2 = np.square(sigmoid(f))/np.square(poisson_link(f))*y
-    return temp1 + temp2
+    sigma = sigmoid(f)
+    A     = poisson_link(f)
+    temp1 = sigma * (1-sigma) * (np.divide(y, A) - 1)
+    temp2 = y * np.square(sigma)/np.square(A)
+    res = temp1 - temp2
+    return min(0, res)
 
 """
 MultiNormal distribution
