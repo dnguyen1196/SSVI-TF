@@ -27,7 +27,6 @@ class tensor(object):
 
     # synthesize data according to some model
     def synthesize(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
-
         """
         :param dims:
         :param means:
