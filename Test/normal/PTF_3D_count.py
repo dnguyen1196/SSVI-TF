@@ -8,7 +8,7 @@ from Tensor.Tensor import tensor
 # Generate synthesize tensor, true, this is what we try to recover
 
 dims     = [50, 50, 50]
-hidden_D = 10
+hidden_D = 20
 
 data = tensor(datatype="count")
 data.synthesize_count_data(dims, hidden_D, 0.8, 0.1)
@@ -17,7 +17,7 @@ data.synthesize_count_data(dims, hidden_D, 0.8, 0.1)
 ################## MODEL and FACTORIZATION #########################
 # The below two modules have to agree with one another on dimension
 
-D = 5
+D = 20
 p_likelihood = distribution("poisson", 1, None, None)
 
 approximate_mean = np.ones((D,)) * 0.1

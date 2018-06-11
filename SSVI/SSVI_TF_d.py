@@ -2,6 +2,7 @@ import Probability.ProbFun as probs
 import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import norm
+from numpy.linalg import cholesky
 import math
 import time
 
@@ -11,27 +12,24 @@ SSVI algorithm to learn the hidden matrix factors behind tensor
 factorization
 """
 class H_SSVI_TF_2d():
-    def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad", batch_size=5):
-        """
-        :param model: the generative model behind factorization
-        :param tensor:
-        :param rank:
-        :param rho_cov: step size formula for covariance parameter
-        :param k1: number of samples for hidden column vectors
-        :param k2: number of samples for f variables
-        :param scheme: optimization scheme
-        """
+    def __init__(self, model, tensor, rank, mean_update="S", cov_update="N", k1=10, k2=10, batch_size=20):
+
         self.model      = model
         self.tensor     = tensor
         self.D          = rank
 
+        self.mean_update  = mean_update
+        self.cov_update   = cov_update
+
         self.size_per_dim = tensor.dims        # dimension of the tensors
         self.order        = len(tensor.dims)   # number of dimensions
-        self.rho_cov      = rho_cov
 
         # Get prior mean and covariance
         self.pmu = np.ones((self.D,))
-        self.pSigma = [1 for _ in self.size_per_dim]
+        self.pSigma = np.ones((len(self.size_per_dim),))
+
+        self.pSigma_inv = np.eye(self.D)
+
         self.likelihood_type = model.p_likelihood.type
 
         if self.likelihood_type == "normal":
@@ -46,7 +44,6 @@ class H_SSVI_TF_2d():
             self.link_fun = lambda m : probs.poisson_link(m)
 
         # optimization scheme
-        self.opt_scheme = scheme
         self.time_step = [1 for _ in range(self.order)]
 
         # Stochastic optimization parameters
@@ -84,11 +81,11 @@ class H_SSVI_TF_2d():
 
             current = time.time()
             if iteration != 0 and iteration % self.report == 0:
-                print ("iteration: ", iteration, " - test error: ", \
-                       self.evaluate_test_error(), " - train error: ",\
-                       self.evaluate_train_error(), " - max mean change: ",\
-                       mean_change, " - max cov change: ", cov_change,\
-                       " - time: ", current - start)
+                print ("it: ", iteration, " - test: ", \
+                       self.evaluate_test_error(), " - train: ",\
+                       self.evaluate_train_error(), " - delta mean: ",\
+                       mean_change, " - delta Cov: ", cov_change,\
+                       " - T: ", current - start)
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -130,7 +127,7 @@ class H_SSVI_TF_2d():
             coord = entry[0]
             y = entry[1]
 
-            if self.likelihood_type == "normal":
+            if self.likelihood_type == "normal": # Case of complete conditional
                 (di_acc_update, Di_acc_update) = self.estimate_di_Di_complete_conditional(dim, i, coord, y, m, S)
             else:
                 (di_acc_update, Di_acc_update) = self.estimate_di_Di(dim, i, coord, y, m, S)
@@ -141,34 +138,52 @@ class H_SSVI_TF_2d():
         Di_acc *= len(observed_i) / min(self.batch_size, len(observed_i))
         di_acc *= len(observed_i) / min(self.batch_size, len(observed_i))
 
-        # Update covariance parameter
-        covGrad = (1. / self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
-        covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+        # Compute next covariance and mean
+        S_next   = self.update_cov_param(dim, i, m, S, di_acc, Di_acc)
+        m_next   = self.update_mean_param(dim, i, m, S, di_acc, Di_acc)
 
-        # TODO: updating the cholesky decomposition, not the actual covariance matrix
-        # TODO: but now the step size is constant anyway
-        S_next = inv((np.ones_like(covGrad) - covStep) * inv(S) + np.multiply(covStep, covGrad))
-
-        # Update mean parameter, NOTE that this using pSigma is the identity
-        meanGrad = (np.inner(1. / self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
-        meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
-        m_next   = m + np.multiply(meanStep, meanGrad)
-
-        mean_change = np.linalg.norm(m_next - m)
-        cov_change  = np.linalg.norm(S_next - S, 'fro')
-        self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
+        # Update the change
         self.model.q_posterior.update(dim, i, (m_next, S_next))
+
+        # Measures the change in the parameters from previous iterations
+        self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
+
+    def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
+        if self.mean_update == "S":
+            meanGrad = (np.inner(self.pSigma_inv, self.pmu - m) + di_acc)
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            m_next = m + np.multiply(meanStep, meanGrad)
+        elif self.mean_update == "N":
+            C = np.inner(inv(S), m)
+            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
+            m_next   = np.inner(S, C_next)
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return m_next
+
+    def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
+        if self.cov_update == "S":
+            L = cholesky(S)
+            covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
+                      - np.inner(L, self.pSigma_inv) + 2 * np.inner(L, Di_acc))
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            L_next  = L + covStep * covGrad
+            S_next  = np.inner(L, np.transpose(L))
+        elif self.cov_update == "N":
+            covGrad = (self.pSigma_inv - 2 * Di_acc)
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return S_next
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
         if self.likelihood_type != "poisson":
             return 0.01
 
         return self.poisson_eta
-
-        acc_grad = self.ada_acc_cov[dim][:, :, i]
-        grad_squared = np.square(covGrad)
-        self.ada_acc_cov[dim][:, :, i] += grad_squared
-        return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_squared)))
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
         """
@@ -183,10 +198,16 @@ class H_SSVI_TF_2d():
         acc_grad = self.ada_acc_grad[dim][:, i]
         grad_sqr = np.square(mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
+
         if self.likelihood_type != "poisson":
             return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
         else:
             return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+
+    def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
+        mean_change = np.linalg.norm(m_next - m)
+        cov_change  = np.linalg.norm(S_next - S, 'fro')
+        self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
 
     def estimate_di_Di_complete_conditional(self, dim, i, coord, y, mui, Sui):
         """
@@ -424,8 +445,7 @@ class H_SSVI_TF_2d():
             m = np.sum(u)
             return self.predict_y_given_m(m)
         else:
-            # if predicting count values, the calculations are more involved
-            # as we first need find the parameters of the posterior distribution
+            # if predicting count values, need to do estimation
             m, S = self.compute_posterior_param(entry)
             # print(probs.poisson_link(m), S)
             return np.rint(m)
