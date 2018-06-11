@@ -1,10 +1,4 @@
 
-
-# - Implement separation between H-MC-SSVI and S-MC-SSVI and N-MC-SSVI (mode)
-- So there will be different options to do the update formula
-- Implement as functions and chosen at runtime
-- 
-
 # Check the code for robust TF
 - Reimplement the gradient computation according to the new formulas
 

@@ -7,7 +7,7 @@ from Tensor.Tensor import tensor
 
 # Generate synthesize tensor, true, this is what we try to recover
 dims        = [50, 50, 50]
-hidden_D    = 10
+hidden_D    = 20
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
 data        = tensor(datatype="binary")
@@ -19,7 +19,7 @@ data.synthesize_binary_data(dims, hidden_D, 0.5, 0.1)
 # The below two modules have to agree with one another on dimension
 # Generate a simple TF_model
 
-D = 10
+D = 20
 p_likelihood = distribution("bernoulli", 1, None, None)
 
 # Approximate posterior initial guess
@@ -34,6 +34,7 @@ p_prior = distribution("normal", 1, ("mean", "sigma"), (m, S))
 model = SSVI_TF_d(p_likelihood, q_posterior, p_prior, likelihood_type="bernoulli")
 
 ############################### FACTORIZATION ##########################
-rho_cov = lambda t : 0.01
-factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov, k1=10, k2=10)
+mean_update = "N"
+cov_update  = "N"
+factorizer = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update)
 factorizer.factorize(report=100)
