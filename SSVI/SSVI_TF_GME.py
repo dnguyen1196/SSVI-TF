@@ -214,18 +214,18 @@ class H_SSVI_TF():
         si          = 0.0
 
         for k1 in range(self.k1):
-            ui = self.sample_uis(othercols, otherdims)
+            ui = self.sample_uis_vectors(othercols, otherdims)
             alpha = np.random.rayleigh(self.w_sigma)
 
             meanf     = np.dot(ui, m)
             covS     = np.dot(ui, np.inner(S, ui))
 
-            Expected_fst_derivative, Expected_snd_derivative = \
-                self.compute_expected_derivatives(y, meanf, covS, alpha)
+            Expected_fst_derivative, Expected_snd_derivative, Expected_log_likelihood \
+                = self.expected_log_likelihood_and_derivatives(y, meanf, covS, alpha)
 
-            di += ui * Expected_fst_derivative/self.k1                   # Update di
-            Di += np.outer(ui, ui) * Expected_snd_derivative/(2*self.k1) # Update Di
-            si += alpha / (8 * self.w_sigma) * Expected_snd_derivative/ self.k1
+            di += 1/self.k1  * ui / Expected_log_likelihood * Expected_fst_derivative                  # Update di
+            Di += 1/(2*self.k1) * np.outer(ui, ui) / Expected_log_likelihood * Expected_snd_derivative # Update Di
+            si += 1/ self.k1 / Expected_log_likelihood *  alpha / (8 * self.w_sigma) * Expected_snd_derivative
 
         return di, Di, si
 
@@ -241,19 +241,33 @@ class H_SSVI_TF():
             sigma += np.trace(S) + np.dot(m, m)
         self.pSigma[dim] = sigma/(M*self.D)
 
-    def compute_expected_derivatives(self, y, meanf, covS, alpha) :
+    def expected_log_likelihood_and_derivatives(self, y, meanf, covS, alpha) :
+        """
+
+        :param y:
+        :param meanf:
+        :param covS:
+        :param alpha:
+        :return:
+        """
         first_derivative = 0.0
         snd_derivative = 0.0
+        log_likelihood = 0.0
         s = self.model.p_likelihood.params
 
         for k2 in range(self.k2):
             f = probs.sample("normal", (meanf, covS + alpha))
-            snd_derivative += probs.snd_derivative(self.likelihood_type, (y, f, s))
+            snd_derivative   += probs.snd_derivative(self.likelihood_type, (y, f, s))
             first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
+            log_likelihood   += probs.log_likelihood(self.likelihood_type, (y, f, s))
 
-        return first_derivative/self.k2, snd_derivative/self.k2
+        return first_derivative/self.k2, snd_derivative/self.k2, log_likelihood/self.k2
 
-    def compute_expected_uis(self, othercols, otherdims):
+    def compute_expected_log_likelihood(self, y, meanf, covS, alpha):
+
+        return
+
+    def compute_expected_uis_product(self, othercols, otherdims):
         uis = np.ones((self.D,))
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior
@@ -261,7 +275,7 @@ class H_SSVI_TF():
             uis = np.multiply(uis, mi)
         return uis
 
-    def sample_uis(self, othercols, otherdims):
+    def sample_uis_vectors(self, othercols, otherdims):
         uis = np.ones((self.D,))
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior

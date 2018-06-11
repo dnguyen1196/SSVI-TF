@@ -1,19 +1,19 @@
-# - Implement separation between H-MC-SSVI and S-MC-SSVI and N-MC-SSVI (mode)
+# Check the code for robust TF
+- first look at the derivations again to be sure
+- then look at the implementation again, may be it's better to have separate 
+samplings to compute the different expectations
 
+# - Implement separation between H-MC-SSVI and S-MC-SSVI and N-MC-SSVI (mode)
+- So there will be different options to do the update formula
+- Implement as functions and chosen at runtime
+- 
 
 # Fix poisson prediction
-- Check why the covariance is 0 (check the eigenvalue lol), it seems random, either
-ok or not ok :|
-- why does the error seem to be increasing instead of decreasing???
-may be the gradient is not correct, check the tensor to see if it agrees
-- The problem doesnt seem to be from initializing the int data, when I tried to spread out the 
-mean of the distribution, the same problem persists
-- tried computing the posterior parameter explicitly, same problem persists
-It seems that the accummulate sum is yugee
+- Look at why the errors shoot up after reaching relatively low error rate
+- Look at the actual prediction that the algorithm outputs
+- Send some report to Roni
 
-- initializing from all mean_q = 1, so some accummulate inner product is pretty big
-may be it's the way I do the rounding
-- It seems that the value for f keep blowing up  :|
-- Make sure that the simple model works first, that the count is the round of the inner product
-of the mean vectors
-- it seems like he vectors keep diverging away from the supposed value
+# Stopping condition check
+- Keeps track of changes in norm of mean vectors and changes in frobenius norm
+of matrix
+ 

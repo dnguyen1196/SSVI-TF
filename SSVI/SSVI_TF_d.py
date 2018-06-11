@@ -21,7 +21,6 @@ class H_SSVI_TF_2d():
         :param k2: number of samples for f variables
         :param scheme: optimization scheme
         """
-
         self.model      = model
         self.tensor     = tensor
         self.D          = rank
@@ -55,6 +54,7 @@ class H_SSVI_TF_2d():
         self.iterations  = 60001
         self.k1          = k1
         self.k2          = k2
+        self.epsilon     = 0.0001
 
         # adagrad parameters
         self.offset = 0.000001
@@ -62,6 +62,9 @@ class H_SSVI_TF_2d():
         self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.size_per_dim]
         self.eta = 1
         self.poisson_eta = 0.05
+
+        # keep track of changes in norm
+        self.norm_changes = [np.ones((s, 2)) for s in self.size_per_dim]
 
     def factorize(self, report=1000):
         self.report = report
@@ -73,12 +76,19 @@ class H_SSVI_TF_2d():
         """
         update_column_pointer = [0] * self.order
         start = time.time()
-        # while self.check_stop_cond():
-        for iteration in range(self.iterations):
+        iteration = 0
+        while True:
+            mean_change, cov_change = self.check_stop_cond()
+            if max(mean_change, cov_change) < self.epsilon:
+                break
+
             current = time.time()
             if iteration != 0 and iteration % self.report == 0:
                 print ("iteration: ", iteration, " - test error: ", \
-                       self.evaluate_test_error(), " - train error: ", self.evaluate_train_error(), " - time: ", current - start)
+                       self.evaluate_test_error(), " - train error: ",\
+                       self.evaluate_train_error(), " - max mean change: ",\
+                       mean_change, " - max cov change: ", cov_change,\
+                       " - time: ", current - start)
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -93,6 +103,8 @@ class H_SSVI_TF_2d():
                     self.time_step[dim] += 1  # increase time step
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.size_per_dim[dim]
+
+            iteration += 1
 
     def update_natural_params(self, dim, i, iteration):
         """
@@ -130,29 +142,22 @@ class H_SSVI_TF_2d():
         di_acc *= len(observed_i) / min(self.batch_size, len(observed_i))
 
         # Update covariance parameter
-        # rhoS = self.rho_cov(iteration)
         covGrad = (1. / self.pSigma[dim] * np.eye(self.D) - 2 * Di_acc)
         covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
 
-        # S = inv((1 - rhoS) * inv(S) + rhoS * covGrad)
         # TODO: updating the cholesky decomposition, not the actual covariance matrix
         # TODO: but now the step size is constant anyway
-        # print(covStep)
-        S = inv((np.ones_like(covGrad) - covStep) * inv(S) + np.multiply(covStep, covGrad))
+        S_next = inv((np.ones_like(covGrad) - covStep) * inv(S) + np.multiply(covStep, covGrad))
 
         # Update mean parameter, NOTE that this using pSigma is the identity
         meanGrad = (np.inner(1. / self.pSigma[dim] * np.eye(self.D), self.pmu - m) + di_acc)
         meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
-        # print(meanStep)
-        m += np.multiply(meanStep, meanGrad)
+        m_next   = m + np.multiply(meanStep, meanGrad)
 
-        evs = np.linalg.eigvals(S)
-        # if ev < 0:
-        #     print(ev)
-        # print("mean: ", max(m), min(m))
-        # print("cov: ", max(evs), min(evs))
-
-        self.model.q_posterior.update(dim, i, (m, S))
+        mean_change = np.linalg.norm(m_next - m)
+        cov_change  = np.linalg.norm(S_next - S, 'fro')
+        self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
+        self.model.q_posterior.update(dim, i, (m_next, S_next))
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
         if self.likelihood_type != "poisson":
@@ -303,7 +308,15 @@ class H_SSVI_TF_2d():
         :return: boolean
         Check for stopping condition
         """
-        return
+        max_mean_change = 0
+        max_cov_change  = 0
+        for dim in range(len(self.size_per_dim)):
+            for col in range(self.size_per_dim[dim]):
+                mean_change, cov_change = self.norm_changes[dim][col, :]
+                max_mean_change = max(max_mean_change, mean_change)
+                max_cov_change  = max(max_cov_change, cov_change)
+
+        return max_mean_change, max_cov_change
 
     def evaluate_train_error(self):
         return self.evaluate_error(self.tensor.train_entries, self.tensor.train_vals)

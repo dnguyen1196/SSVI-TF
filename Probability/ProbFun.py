@@ -40,10 +40,14 @@ def normal_sample(mu, sig):
 def multivariate_normal_sample(m, S):
     return multivariate_normal(m, S)
 
-def normal_fst_derivative(y, f, s):
+def normal_log_likelihood(y, f, s):
+    print(y, f)
+    return -0.5*np.log(2 * np.pi * np.sqrt(s)) - np.square(y-f)/(2*s)
+
+def normal_fst_log_derivative(y, f, s):
     return (y-f)/s
 
-def normal_snd_derivative(y, f, s):
+def normal_snd_log_derivative(y, f, s):
     return -1/s
 
 
@@ -91,7 +95,7 @@ def sample(name, args):
 
 def fst_derivative(name, args):
     if name == "normal":
-        return normal_fst_derivative(*args)
+        return normal_fst_log_derivative(*args)
     elif name == "poisson":
         return poisson_fst_derivative(*args)
     elif name == "bernoulli":
@@ -99,8 +103,12 @@ def fst_derivative(name, args):
 
 def snd_derivative(name, args):
     if name == "normal":
-        return normal_snd_derivative(*args)
+        return normal_snd_log_derivative(*args)
     elif name == "poisson":
         return poisson_snd_derivative(*args)
     elif name == "bernoulli":
         return bernoulli_snd_derivative(*args)
+
+def log_likelihood(name, args):
+    if name == "normal":
+        return normal_log_likelihood(*args)
