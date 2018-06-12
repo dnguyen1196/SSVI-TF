@@ -58,7 +58,7 @@ class H_SSVI_TF_2d():
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
         self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.size_per_dim]
         self.eta = 1
-        self.poisson_eta = 0.05
+        self.poisson_eta = 0.01
 
         # keep track of changes in norm
         self.norm_changes = [np.ones((s, 2)) for s in self.size_per_dim]
@@ -448,6 +448,6 @@ class H_SSVI_TF_2d():
             # if predicting count values, need to do estimation
             m, S = self.compute_posterior_param(entry)
             # print(probs.poisson_link(m), S)
-            return np.rint(m)
-            # res  = self.compute_expected_count(m, S)
-            # return np.rint(res)
+            # return np.rint(m)
+            res  = self.compute_expected_count(m, S)
+            return np.rint(res)

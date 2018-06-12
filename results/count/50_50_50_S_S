@@ -1,0 +1,5 @@
+it:  1000  - test:  2.338  - train:  2.323  - delta mean:  0.06983196375894922  - delta Cov:  0  - T:  468.1209383010864
+it:  2000  - test:  1.9656  - train:  1.9414  - delta mean:  0.06160132482166713  - delta Cov:  0  - T:  937.8397114276886
+it:  3000  - test:  2.176  - train:  2.1421  - delta mean:  0.04768079493132913  - delta Cov:  0  - T:  1408.172348022461
+it:  4000  - test:  1.6172  - train:  1.5851  - delta mean:  0.0491063699166461  - delta Cov:  0  - T:  1878.1380634307861
+it:  5000  - test:  1.2256  - train:  1.1919  - delta mean:  0.05265528513796758  - delta Cov:  0  - T:  2348.065676212311

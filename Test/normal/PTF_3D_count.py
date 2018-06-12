@@ -7,8 +7,8 @@ from Tensor.Tensor import tensor
 # np.random.seed(seed=317) # For control and comparisons
 # Generate synthesize tensor, true, this is what we try to recover
 
-dims     = [50, 50, 50]
-hidden_D = 20
+dims     = [10, 10, 10]
+hidden_D = 10
 
 data = tensor(datatype="count")
 data.synthesize_count_data(dims, hidden_D, 0.8, 0.1)
@@ -17,7 +17,7 @@ data.synthesize_count_data(dims, hidden_D, 0.8, 0.1)
 ################## MODEL and FACTORIZATION #########################
 # The below two modules have to agree with one another on dimension
 
-D = 20
+D = 10
 p_likelihood = distribution("poisson", 1, None, None)
 
 approximate_mean = np.ones((D,)) * 0.1
@@ -32,6 +32,7 @@ model = SSVI_TF_d(p_likelihood, q_posterior, p_prior)
 
 ############################### FACTORIZATION ##########################
 
-rho_cov = lambda t: 0.01
-factorizer = H_SSVI_TF_2d(model, data, rank=D, rho_cov=rho_cov)
-factorizer.factorize(report=1000)
+mean_update = "S"
+cov_update  = "S"
+factorizer = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update)
+factorizer.factorize(report=100)
