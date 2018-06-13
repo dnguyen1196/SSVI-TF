@@ -7,7 +7,7 @@ from Tensor.Tensor import tensor
 # np.random.seed(seed=317) # For control and comparisons
 # Generate synthesize tensor, true, this is what we try to recover
 
-dims     = [100, 100, 100]
+dims     = [50, 50, 50]
 hidden_D = 20
 
 data = tensor(datatype="count")
@@ -33,6 +33,6 @@ model = SSVI_TF_d(p_likelihood, q_posterior, p_prior)
 ############################### FACTORIZATION ##########################
 
 mean_update = "S"
-cov_update  = "S"
-factorizer = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update)
-factorizer.factorize(report=1000)
+cov_update  = "N"
+factorizer = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update, k1=20, k2=20)
+factorizer.factorize(report=50)

@@ -4,6 +4,7 @@ from numpy.linalg import inv
 from numpy.linalg import norm
 from numpy.linalg import cholesky
 import math
+from math import log10, floor
 import time
 
 """
@@ -12,7 +13,7 @@ SSVI algorithm to learn the hidden matrix factors behind tensor
 factorization
 """
 class H_SSVI_TF_2d():
-    def __init__(self, model, tensor, rank, mean_update="S", cov_update="N", k1=10, k2=10, batch_size=20):
+    def __init__(self, model, tensor, rank, mean_update="S", cov_update="N", k1=10, k2=10, batch_size=100):
 
         self.model      = model
         self.tensor     = tensor
@@ -54,11 +55,11 @@ class H_SSVI_TF_2d():
         self.epsilon     = 0.0001
 
         # adagrad parameters
-        self.offset = 0.000001
+        self.offset       = 0.000001
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
         self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.size_per_dim]
-        self.eta = 1
-        self.poisson_eta = 0.01
+        self.eta          = 1
+        self.poisson_eta  = 0.1
 
         # keep track of changes in norm
         self.norm_changes = [np.ones((s, 2)) for s in self.size_per_dim]
@@ -81,11 +82,7 @@ class H_SSVI_TF_2d():
 
             current = time.time()
             if iteration != 0 and iteration % self.report == 0:
-                print ("it: ", iteration, " - test: ", \
-                       self.evaluate_test_error(), " - train: ",\
-                       self.evaluate_train_error(), " - delta mean: ",\
-                       mean_change, " - delta Cov: ", cov_change,\
-                       " - T: ", current - start)
+                self.report_metrics(iteration, start, mean_change, cov_change)
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -155,7 +152,7 @@ class H_SSVI_TF_2d():
             m_next = m + np.multiply(meanStep, meanGrad)
         elif self.mean_update == "N":
             C = np.inner(inv(S), m)
-            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc
+            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc - 2 * np.inner(Di_acc, m)
             meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
             C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
             m_next   = np.inner(S, C_next)
@@ -180,10 +177,9 @@ class H_SSVI_TF_2d():
         return S_next
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
-        if self.likelihood_type != "poisson":
-            return 0.01
-
-        return self.poisson_eta
+        if self.likelihood_type == "poisson":
+            return 1/(self.time_step[dim]+100)
+        return 1/(self.time_step[dim] + 1)
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
         """
@@ -199,6 +195,7 @@ class H_SSVI_TF_2d():
         grad_sqr = np.square(mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
 
+        # return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
         if self.likelihood_type != "poisson":
             return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
         else:
@@ -238,7 +235,7 @@ class H_SSVI_TF_2d():
             d_acc = np.multiply(d_acc, m)
             D_acc = np.multiply(D_acc, S + np.outer(m, m))
 
-        Di = -1./s * D_acc
+        Di = -1./(2*s) * D_acc
         di = y/s * d_acc - 1./s * np.inner(D_acc, mui)
         return di, Di
 
@@ -269,8 +266,6 @@ class H_SSVI_TF_2d():
 
             meanf     = np.dot(ui, m)
             covS     = np.dot(ui, np.inner(S, ui))
-
-            # print(meanf)
 
             Expected_fst_derivative, Expected_snd_derivative = \
                 self.estimate_expected_derivative(y, meanf, covS)
@@ -317,12 +312,43 @@ class H_SSVI_TF_2d():
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior
             (mi, Si) = self.model.q_posterior.find(otherdims[dim], col)
-            # try:
             uj_sample = probs.sample("multivariate_normal", (mi, Si))
             uis = np.multiply(uis, uj_sample)
-            # except Warning:
-            #     print(min(np.linalg.eigvals(Si)))
+
         return uis
+
+    def report_metrics(self, iteration, start, mean_change, cov_change):
+        if iteration == self.report:
+            print("iteration |  time  |  test_err  | train_err |  d_mean | d_cov |", end=" ")
+            if self.likelihood_type == "poisson":
+                print(" test_nll |  train_nll ")
+            else:
+                print("")
+        current = time.time()
+        dec = 4
+        print(iteration, np.rint(current - start),\
+              np.around(self.evaluate_test_error(), dec),\
+              np.around(self.evaluate_train_error(), dec), \
+              np.around(mean_change, dec),\
+              np.around(cov_change, dec), end=" ")
+        if self.likelihood_type == "poisson":
+            print(np.around(self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), dec), \
+                  np.around(self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec))
+        else:
+            print("")
+
+    def evaluate_vlb(self):
+        return
+
+    def evaluate_nll(self, entries, values):
+        nll = 0.
+        for i in range(len(values)):
+            entry = entries[i]
+            k     = values[i]
+            m, S  = self.compute_posterior_param(entry)
+            likelihood = self.compute_gauss_hermite(k, m, S)
+            nll       -= np.log(likelihood)
+        return nll
 
     def check_stop_cond(self):
         """
@@ -447,7 +473,5 @@ class H_SSVI_TF_2d():
         else:
             # if predicting count values, need to do estimation
             m, S = self.compute_posterior_param(entry)
-            # print(probs.poisson_link(m), S)
-            # return np.rint(m)
             res  = self.compute_expected_count(m, S)
             return np.rint(res)

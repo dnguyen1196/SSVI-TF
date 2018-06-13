@@ -34,7 +34,7 @@ p_prior = distribution("normal", 1, ("mean", "sigma"), (m, S))
 model = SSVI_TF_d(p_likelihood, q_posterior, p_prior, likelihood_type="bernoulli")
 
 ############################### FACTORIZATION ##########################
-mean_update = "N"
+mean_update = "S"
 cov_update  = "N"
-factorizer = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update)
+factorizer  = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update)
 factorizer.factorize(report=100)
