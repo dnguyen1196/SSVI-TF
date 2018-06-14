@@ -1,6 +1,8 @@
 # Additional implementation
 - Why is the NLL increasing instead of decreasing
-- And while the NLL is increasing, why does the error decreasing, 
+- And while the NLL is increasing, why does the error decreasing,
+(May be the NLL is not an accurate indicator of the algorithm's performance?) 
+- Implement function to compute the VLB
 
 # Have another implementation for suboptimal bound
 

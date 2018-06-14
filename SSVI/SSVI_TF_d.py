@@ -338,12 +338,25 @@ class H_SSVI_TF_2d():
             print('{:^10} {:^10}'\
                   .format(np.around(\
                             self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), dec), \
-                  np.around(\
+                          np.around(\
                             self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec)))
         else:
             print("")
 
-    def evaluate_vlb(self):
+    def estimate_vlb(self, entries, values):
+        # For each entry, find posterior distribution and
+        # sample to compute the expected log likelihood
+        # there is also the KL divergence term
+        vlb = 0.0
+        for i in range(len(values)):
+            entry = entries[i]
+            val   = values[i]
+            m, S  = self.compute_posterior_param(entry)
+
+    def estimate_expected_log_likelihood(self, m, S):
+        return
+
+    def compute_KL_divergence(self, m, S):
         return
 
     def evaluate_nll(self, entries, values):

@@ -148,7 +148,7 @@ class tensor(object):
         ndim = len(dims)
         matrices = [[]] * ndim
 
-        mean_array = np.linspace(-2, 2, ndim)
+        mean_array = np.linspace(0, 3, ndim)
         # Generate the random hidden matrices
         for i in range(ndim):
             mean = np.ones((D,)) * mean_array[i]

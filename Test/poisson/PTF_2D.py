@@ -7,18 +7,17 @@ from Tensor.Tensor import tensor
 # np.random.seed(seed=317) # For control and comparisons
 # Generate synthesize tensor, true, this is what we try to recover
 
-# dims     = [50, 50, 50]
-dims     = [10, 10, 10]
-hidden_D = 20
+dims     = [10, 10]
+hidden_D = 50
 
 data = tensor(datatype="count")
-data.synthesize_count_data(dims, hidden_D, 0.8, 0.1)
+data.synthesize_count_data(dims, hidden_D, 0.8, 1)
 
 
 ################## MODEL and FACTORIZATION #########################
 # The below two modules have to agree with one another on dimension
 
-D = 20
+D = 50
 p_likelihood = distribution("poisson", 1, None, None)
 
 approximate_mean = np.ones((D,)) * 0.1
