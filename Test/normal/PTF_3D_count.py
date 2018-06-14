@@ -7,7 +7,8 @@ from Tensor.Tensor import tensor
 # np.random.seed(seed=317) # For control and comparisons
 # Generate synthesize tensor, true, this is what we try to recover
 
-dims     = [50, 50, 50]
+# dims     = [50, 50, 50]
+dims     = [10, 10, 10]
 hidden_D = 20
 
 data = tensor(datatype="count")

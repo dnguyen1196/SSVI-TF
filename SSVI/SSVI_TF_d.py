@@ -319,21 +319,27 @@ class H_SSVI_TF_2d():
 
     def report_metrics(self, iteration, start, mean_change, cov_change):
         if iteration == self.report:
-            print("iteration |  time  |  test_err  | train_err |  d_mean | d_cov |", end=" ")
+            print("iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |", end=" ")
             if self.likelihood_type == "poisson":
-                print(" test_nll |  train_nll ")
+                print("test_nll | train_nll ")
             else:
                 print("")
         current = time.time()
         dec = 4
-        print(iteration, np.rint(current - start),\
+
+        print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
+              .format(iteration, np.rint(current - start),\
               np.around(self.evaluate_test_error(), dec),\
               np.around(self.evaluate_train_error(), dec), \
               np.around(mean_change, dec),\
-              np.around(cov_change, dec), end=" ")
+              np.around(cov_change, dec)), end=" ")
+
         if self.likelihood_type == "poisson":
-            print(np.around(self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), dec), \
-                  np.around(self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec))
+            print('{:^10} {:^10}'\
+                  .format(np.around(\
+                            self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), dec), \
+                  np.around(\
+                            self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec)))
         else:
             print("")
 
