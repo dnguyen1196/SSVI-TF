@@ -1,6 +1,6 @@
 import numpy as np
 
-from SSVI.SSVI_TF_sub_optimal import SSVI_TF_sub_optimal
+from SSVI.Backup.SSVI_TF_sub_optimal import SSVI_TF_sub_optimal
 from Tensor.Tensor import Tensor
 
 np.random.seed(seed=317) # For control and comparison

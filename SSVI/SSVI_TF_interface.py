@@ -1,49 +1,54 @@
+from abc import abstractclassmethod, abstractmethod
 import Probability.ProbFun as probs
 import numpy as np
+
 from numpy.linalg import inv
 from numpy.linalg import norm
 from numpy.linalg import cholesky
-from Model.TF_Models import ApproximatePosteriorParams
+from Model.TF_Models import Posterior_Full_Covariance
+
+from Probability.normal import NormalDistribution
+from Probability.bernoulli import BernoulliDistribution
+from Probability.poisson import PoissonDistribution
+
 import math
-from math import log10, floor
 import time
 
-"""
-SSVI_TF_sub_optimal.py
-SSVI algorithm to learn the hidden matrix factors behind data
-factorization
-"""
-class SSVI_TF_sub_optimal():
-    def __init__(self, tensor, rank, mean_update="S", cov_update="N" , mean0=None, cov0= None, k1=10, k2=10, batch_size=100):
-        self.dims       = tensor.dims        # dimension of the tensors
-        self.order      = len(tensor.dims)   # number of dimensions
-        self.tensor     = tensor
-        self.D          = rank
+class SSVI_TF(object):
+    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
+                 mean0=None, cov0=None, sigma0=1,k1=20, k2=10, batch_size=100):
+
+        self.tensor = tensor
+        self.dims   = tensor.dims
         self.datatype   = tensor.datatype
+        self.order      = len(tensor.dims)   # number of dimensions
 
-        self.posterior  = ApproximatePosteriorParams(self.dims, self.D, mean0, cov0)
+        self.D      = rank
+        self.mean_update = mean_update
+        self.cov_update  = cov_update
+        self.noise_update = noise_update
 
-        self.mean_update  = mean_update
-        self.cov_update   = cov_update
+        self.mean0  = mean0
+        self.cov0   = cov0
+        self.w_sigma = sigma0
+        self.k1     = k1
+        self.k2     = k2
+        self.batch_size = batch_size
 
-        # Get prior mean and covariance
         self.pmu             = np.ones((self.D,))
         self.pSigma          = np.ones((len(self.dims),))
-        self.pSigma_inv      = np.eye(self.D)
 
-        self.w_tau = 1.
-        self.w_sigma = 1.
-        self.w_ada_grad = 0.
-
+        # self.pSigma_inv      = np.eye(self.D)
         if self.datatype == "real":
             self.link_fun = lambda m : m
             self.likelihood_type = "normal"
             self.likelihood_param = 1
+            self.likelihood = NormalDistribution()
         elif self.datatype == "binary":
             self.link_fun = lambda m : probs.sigmoid(m)
             self.likelihood_type = "bernoulli"
             self.likelihood_param = 0 # Not used
-
+            self.likelihood = BernoulliDistribution()
         elif self.datatype == "count":
             self.likelihood_type = "poisson"
             self.max_count   = tensor.max_count
@@ -52,38 +57,27 @@ class SSVI_TF_sub_optimal():
             self.hermite_points, self.hermite_weights = np.polynomial.hermite.hermgauss(self.herm_degree)
             self.link_fun = lambda m : probs.poisson_link(m)
             self.likelihood_param = 0 # Not used
+            self.likelihood = PoissonDistribution()
 
-        # optimization scheme
-        self.time_step = [1 for _ in range(self.order)]
+        self.time_step = [0 for _ in range(self.order)]
+        self.epsilon = 0.0001
 
-        # Stochastic optimization parameters
-        self.batch_size  = batch_size
-        self.iterations  = 60001
-        self.k1          = k1
-        self.k2          = k2
-        self.epsilon     = 0.0001
-
-        # adagrad parameters
-        self.offset       = 0.000001
+        # Adagrad parameters
+        self.offset = 0.000001
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
-        self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.dims]
-        self.eta          = 1
-        self.poisson_eta  = 0.1
+        self.ada_acc_cov = [np.zeros((self.D, self.D, s)) for s in self.dims]
+        self.eta = 1
+        self.poisson_eta = 0.1
 
         # keep track of changes in norm
         self.norm_changes = [np.ones((s, 2)) for s in self.dims]
 
     def factorize(self, report=1000):
         self.report = report
-        """
-        factorize
-        :return: None
-        Doing round robin updates for each column of the
-        hidden matrices
-        """
         update_column_pointer = [0] * self.order
         start = time.time()
         iteration = 0
+
         while True:
             mean_change, cov_change = self.check_stop_cond()
 
@@ -93,7 +87,6 @@ class SSVI_TF_sub_optimal():
 
             if max(mean_change, cov_change) < self.epsilon:
                 break
-
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -110,211 +103,42 @@ class SSVI_TF_sub_optimal():
                                              % self.dims[dim]
 
             iteration += 1
+        return
 
     def update_natural_params(self, dim, i, iteration):
-        """
-        :param i:
-        :param dim:
-        :return:
-        Update the natural parameter for the hidden column vector
-        of dimension dim and column i
-        """
         observed_i = self.tensor.find_observed_ui(dim, i)
-        # print(observed_i)
         if len(observed_i) > self.batch_size:
             observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
             observed_i = np.take(observed_i, observed_idx, axis=0)
 
         M = len(observed_i)
         (m, S) = self.posterior.get_vector_distribution(dim, i)
-
-        Di_acc = np.zeros((self.D, self.D))
-        di_acc = np.zeros((self.D,))
-        si_acc = 0.
+        di, Di, si = self.initialize_di_Di_si()
 
         for entry in observed_i:
             coord = entry[0]
             y = entry[1]
 
-            # if self.likelihood_type == "normal": # Case of complete conditional
-            #     (dij, Dij) = self.compute_di_Di_si_complete_conditional(dim, i, coord, y, m, S)
-            # else:
-            (dij, Dij, sij) = self.estimate_di_Di(dim, i, coord, y, m, S)
+            (di_hat, Di_hat, si_hat) = self.estimate_di_Di_si(dim, i, coord, y, m, S)
 
-            Di_acc += Dij
-            di_acc += dij
-            si_acc += sij
+            Di += Di_hat
+            di += di_hat
+            si += si_hat
 
         scale = len(observed_i) / min(self.batch_size, len(observed_i))
-
-        Di_acc *= scale
-        di_acc *= scale
-        si_acc *= scale
+        Di *= scale
+        di *= scale
+        si *= scale
 
         # Compute next covariance and mean
-        S_next   = self.update_cov_param(dim, i, m, S, di_acc, Di_acc)
-        m_next   = self.update_mean_param(dim, i, m, S, di_acc, Di_acc)
-
-        self.update_noise_param(si_acc)
+        S_next   = self.update_cov_param(dim, i, m, S, di, Di)
+        m_next   = self.update_mean_param(dim, i, m, S, di, Di)
+        self.update_sigma_param(si, scale)
 
         # Measures the change in the parameters from previous iterations
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
-
         # Update the change
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
-
-    def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
-        if self.mean_update == "S":
-            meanGrad = (np.inner(self.pSigma_inv, self.pmu - m) + di_acc)
-            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
-            m_next = m + np.multiply(meanStep, meanGrad)
-        elif self.mean_update == "N":
-            C = np.inner(inv(S), m)
-            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc - 2 * np.inner(Di_acc, m)
-            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
-            C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
-            m_next   = np.inner(S, C_next)
-        else:
-            raise Exception("Unidentified update formula for covariance param")
-        return m_next
-
-    def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
-        if self.cov_update == "S":
-            L = cholesky(S)
-            covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
-                      - np.inner(L, self.pSigma_inv) + 2 * np.inner(L, Di_acc))
-            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-            L_next  = L + covStep * covGrad
-            S_next  = np.inner(L, np.transpose(L))
-        elif self.cov_update == "N":
-            covGrad = (self.pSigma_inv - 2 * Di_acc)
-            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-            S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
-        else:
-            raise Exception("Unidentified update formula for covariance param")
-        return S_next
-
-    def compute_stepsize_cov_param(self, dim, i, covGrad):
-        if self.likelihood_type == "poisson":
-            return 1/(self.time_step[dim]+100)
-        return 1/(self.time_step[dim] + 1)
-
-    def compute_stepsize_mean_param(self, dim, i, mGrad):
-        """
-        :param dim: dimension of the hidden matrix
-        :param i: column of hidden matrix
-        :param mGrad: computed gradient
-        :return:
-
-        Compute the update for the mean parameter dependnig on the
-        optimization scheme
-        """
-        acc_grad = self.ada_acc_grad[dim][:, i]
-        grad_sqr = np.square(mGrad)
-        self.ada_acc_grad[dim][:, i] += grad_sqr
-
-        # return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        if self.likelihood_type != "poisson":
-            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        else:
-            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-
-    def update_noise_param(self, si_acc):
-        w_grad = -1/np.square(self.w_tau) + si_acc
-        self.w_ada_grad += np.square(w_grad)
-        w_step = self.eta / self.w_ada_grad
-        update = (1-w_step) * (-1/np.square(self.w_sigma)) + w_step * w_grad
-        self.w_sigma = np.sqrt(-1/update)
-
-    def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
-        mean_change = np.linalg.norm(m_next - m)
-        cov_change  = np.linalg.norm(S_next - S, 'fro')
-        self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
-
-    def compute_di_Di_si_complete_conditional(self, dim, i, coord, y, mui, Sui):
-        """
-        :param dim:
-        :param i:
-        :param coord:
-        :param y:
-        :param m:
-        :param S:
-        :return:
-
-        dij and Dij with closed form update for when the likelihood
-        is Gaussian
-        """
-        othercols    = coord[: dim]
-        othercols.extend(coord[dim + 1 :])
-
-        alldims       = list(range(self.order))
-        otherdims     = alldims[:dim]
-        otherdims.extend(alldims[dim + 1 : ])
-
-        d_acc = np.ones((self.D,))
-        D_acc = np.ones((self.D,self.D))
-        s = self.likelihood_param
-
-        for j, d in enumerate(otherdims):
-            m, S = self.posterior.get_vector_distribution(d, othercols[j])
-            d_acc = np.multiply(d_acc, m)
-            D_acc = np.multiply(D_acc, S + np.outer(m, m))
-
-        Di = -1./(2*s) * D_acc
-        di = y/s * d_acc - 1./s * np.inner(D_acc, mui)
-        return di, Di
-
-    def estimate_di_Di(self, dim, i, coord, y, m, S):
-        """
-        :param dim:
-        :param i:
-        :param coord:
-        :param y:
-        :return:
-
-        Estimate the di and Di (see paper for details) based
-        on the given coordinate point, its value y, current
-        mean and covariance m, S
-        """
-        othercols    = coord[: dim]
-        othercols.extend(coord[dim + 1 :])
-
-        alldims       = list(range(self.order))
-        otherdims     = alldims[:dim]
-        otherdims.extend(alldims[dim + 1 : ])
-
-        di          = np.zeros((self.D, ))
-        Di          = np.zeros((self.D, self.D))
-
-        for k1 in range(self.k1):
-            others_prod = self.sample_uis(othercols, otherdims)
-            w       = np.random.rayleigh(self.w_sigma)
-            meanf   = np.dot(others_prod, m)
-            covS    = np.dot(others_prod, np.inner(S, others_prod)) + w
-
-            fst_deriv, snd_deriv = \
-                self.estimate_expected_derivative(y, meanf, covS)
-
-            di += others_prod * fst_deriv/self.k1                   # Update di
-            Di += np.outer(others_prod, others_prod) * snd_deriv/(2*self.k1) # Update Di
-
-        si = self.estimate_si(othercols, otherdims, m, S, y)
-
-        return di, Di, si
-
-    def estimate_si(self, othercols, otherdims, m, S, y):
-        si = 0.
-        for k1 in range(self.k1):
-            ui = np.random.multivariate_normal(m, S)
-            uis = self.sample_uis(othercols, otherdims)
-            w = np.random.rayleigh(self.w_sigma)
-
-            meanf = np.sum(np.multiply(ui, uis))
-            covf  = w
-            _, snd_deriv = self.estimate_expected_derivative(y, meanf, covf)
-
-            si += w/(8 * np.square(self.w_sigma)) * snd_deriv
-        return si / self.k1
 
     def update_hyper_parameter(self, dim, iteration):
         """
@@ -326,38 +150,48 @@ class SSVI_TF_sub_optimal():
         for j in range(M):
             m, S = self.posterior.get_vector_distribution(dim, j)
             sigma += np.trace(S) + np.dot(m, m)
+
         self.pSigma[dim] = sigma/(M*self.D)
 
-    def estimate_expected_derivative(self, y, meanf, covS) :
-        first_derivative = 0.0
-        snd_derivative = 0.0
-        s = self.likelihood_param
+    @abstractmethod
+    def initialize_di_Di_si(self):
+        raise NotImplementedError
 
-        for k2 in range(self.k2):
-            f = probs.sample("normal", (meanf, covS))
-            snd_derivative += probs.snd_derivative(self.likelihood_type, (y, f, s))
-            first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
+    @abstractmethod
+    def estimate_di_Di_si(self, dim, i, coord, y, m, S):
+        raise NotImplementedError
 
-        return first_derivative/self.k2, snd_derivative/self.k2
+    @abstractmethod
+    def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
+        raise NotImplementedError
 
-    def compute_expected_uis(self, othercols, otherdims):
+    @abstractmethod
+    def update_cov_param(self, dim, i, m, S, di_acc, Di_acc):
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_sigma_param(self, si_acc, scale):
+        raise NotImplementedError
+
+    @abstractmethod
+    def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
+        raise NotImplementedError
+
+    def sample_vjs(self, othercols, otherdims):
         uis = np.ones((self.D,))
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior
             (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
-            uis = np.multiply(uis, mi)
-        return uis
 
-    def sample_uis(self, othercols, otherdims):
-        uis = np.ones((self.D,))
-        for dim, col in enumerate(othercols):
-            # Sample from the approximate posterior
-            (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
+            # TODO: check dimension of Si
             uj_sample = np.random.multivariate_normal(mi, Si)
-            uis = np.multiply(uis, uj_sample)
 
+            uis = np.multiply(uis, uj_sample)
         return uis
 
+    """
+    Functions to report metrics (error, vlb, etc)
+    """
     def report_metrics(self, iteration, start, mean_change, cov_change):
         if iteration == self.report:
             print("iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |", end=" ")
@@ -385,9 +219,6 @@ class SSVI_TF_sub_optimal():
             print("")
 
     def estimate_vlb(self, entries, values):
-        # For each entry, find posterior distribution and
-        # sample to compute the expected log likelihood
-        # there is also the KL divergence term
         vlb = 0.0
         for i in range(len(values)):
             entry = entries[i]
@@ -395,10 +226,10 @@ class SSVI_TF_sub_optimal():
             m, S  = self.compute_posterior_param(entry)
 
     def estimate_expected_log_likelihood(self, m, S):
-        return
+        raise NotImplementedError
 
     def compute_KL_divergence(self, m, S):
-        return
+        raise NotImplementedError
 
     def evaluate_nll(self, entries, values):
         nll = 0.
@@ -522,7 +353,7 @@ class SSVI_TF_sub_optimal():
         return np.sum(np.multiply(probs, np.array(k_array)))/sum_probs
 
     def predict_entry(self, entry):
-        # If not count-valued data
+        # If not count-valued tensor
         if self.likelihood_type != "poisson":
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):

@@ -1,3 +1,7 @@
+# Implement a common interface
+- pSigma vs pSigma inverse
+- Posterior_diag_covariance class
+
 # Have another implementation for suboptimal bound
 - Check if there is a closed form update for the case of complete conditional 
 

@@ -3,54 +3,47 @@ import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import norm
 from numpy.linalg import cholesky
-from Model.TF_Models import ApproximatePosteriorParams
 import math
 from math import log10, floor
 import time
 
 """
-SSVI_TF.py
-SSVI algorithm to learn the hidden matrix factors behind tensor
+SSVI_TF_simple.py
+SSVI algorithm to learn the hidden matrix factors behind data
 factorization
+The 'simple algorithm' -> no covariance update
 """
-class SSVI_TF_deterministic():
-    def __init__(self, tensor, rank, mean_update="S", cov_update="N", mean0=None, cov0= None, k1=10, k2=10, batch_size=100):
-        self.dims       = tensor.dims        # dimension of the tensors
-        self.order      = len(tensor.dims)   # number of dimensions
+class SSVI_TF_simple():
+    def __init__(self, model, tensor, rank, mean_update="S", cov_update="N", k1=10, k2=10, batch_size=100):
+
+        self.model      = model
         self.tensor     = tensor
         self.D          = rank
-        self.datatype   = tensor.datatype
-
-        self.posterior  = ApproximatePosteriorParams(self.dims, self.D, mean0, cov0)
 
         self.mean_update  = mean_update
         self.cov_update   = cov_update
 
+        self.size_per_dim = tensor.dims        # dimension of the tensors
+        self.order        = len(tensor.dims)   # number of dimensions
+
         # Get prior mean and covariance
-        self.pmu             = np.ones((self.D,))
-        self.pSigma          = np.ones((len(self.dims),))
-        self.pSigma_inv      = np.eye(self.D)
+        self.pmu = np.ones((self.D,))
+        self.pSigma = np.ones((len(self.size_per_dim),))
 
-        if self.datatype == "real":
+        self.pSigma_inv = np.eye(self.D)
+
+        self.likelihood_type = model.p_likelihood.type
+
+        if self.likelihood_type == "normal":
             self.link_fun = lambda m : m
-            self.likelihood_type = "normal"
-            self.likelihood_param = 1
-            self.probs = NormalDistribution()
-        elif self.datatype == "binary":
+        elif self.likelihood_type == "bernoulli":
             self.link_fun = lambda m : probs.sigmoid(m)
-            self.likelihood_type = "bernoulli"
-            self.likelihood_param = 0 # Not used
-            self.probs = BernoulliDistribution()
-
-        elif self.datatype == "count":
-            self.likelihood_type = "poisson"
+        elif self.likelihood_type == "poisson":
             self.max_count   = tensor.max_count
             self.min_count   = tensor.min_count
             self.herm_degree = 50
             self.hermite_points, self.hermite_weights = np.polynomial.hermite.hermgauss(self.herm_degree)
             self.link_fun = lambda m : probs.poisson_link(m)
-            self.likelihood_param = 0 # Not used
-            self.probs = PoissonDistribution()
 
         # optimization scheme
         self.time_step = [1 for _ in range(self.order)]
@@ -64,13 +57,13 @@ class SSVI_TF_deterministic():
 
         # adagrad parameters
         self.offset       = 0.000001
-        self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
-        self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.dims]
+        self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.size_per_dim]
+        self.ada_acc_cov  = [np.zeros((self.D, self.D, s)) for s in self.size_per_dim]
         self.eta          = 1
         self.poisson_eta  = 0.1
 
         # keep track of changes in norm
-        self.norm_changes = [np.ones((s, 2)) for s in self.dims]
+        self.norm_changes = [np.ones((s, 2)) for s in self.size_per_dim]
 
     def factorize(self, report=1000):
         self.report = report
@@ -85,14 +78,12 @@ class SSVI_TF_deterministic():
         iteration = 0
         while True:
             mean_change, cov_change = self.check_stop_cond()
+            if max(mean_change, cov_change) < self.epsilon:
+                break
 
             current = time.time()
             if iteration != 0 and iteration % self.report == 0:
                 self.report_metrics(iteration, start, mean_change, cov_change)
-
-            if max(mean_change, cov_change) < self.epsilon:
-                break
-
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -103,10 +94,10 @@ class SSVI_TF_deterministic():
 
             # Move on to the next column of the hidden matrices
             for dim in range(self.order):
-                if (update_column_pointer[dim] + 1 == self.dims[dim]):
+                if (update_column_pointer[dim] + 1 == self.size_per_dim[dim]):
                     self.time_step[dim] += 1  # increase time step
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
-                                             % self.dims[dim]
+                                             % self.size_per_dim[dim]
 
             iteration += 1
 
@@ -125,7 +116,7 @@ class SSVI_TF_deterministic():
             observed_i = np.take(observed_i, observed_idx, axis=0)
 
         M = len(observed_i)
-        (m, S) = self.posterior.get_vector_distribution(dim, i)
+        (m, S) = self.model.q_posterior.find(dim, i)
 
         Di_acc = np.zeros((self.D, self.D))
         di_acc = np.zeros((self.D,))
@@ -149,11 +140,11 @@ class SSVI_TF_deterministic():
         S_next   = self.update_cov_param(dim, i, m, S, di_acc, Di_acc)
         m_next   = self.update_mean_param(dim, i, m, S, di_acc, Di_acc)
 
+        # Update the change
+        self.model.q_posterior.update(dim, i, (m_next, S_next))
+
         # Measures the change in the parameters from previous iterations
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
-
-        # Update the change
-        self.posterior.update_vector_distribution(dim, i, m_next, S_next)
 
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
         if self.mean_update == "S":
@@ -238,10 +229,10 @@ class SSVI_TF_deterministic():
 
         d_acc = np.ones((self.D,))
         D_acc = np.ones((self.D,self.D))
-        s = self.likelihood_param
+        s = self.model.p_likelihood.params
 
         for j, d in enumerate(otherdims):
-            m, S = self.posterior.get_vector_distribution(d, othercols[j])
+            m, S = self.model.q_posterior.find(d, othercols[j])
             d_acc = np.multiply(d_acc, m)
             D_acc = np.multiply(D_acc, S + np.outer(m, m))
 
@@ -291,16 +282,16 @@ class SSVI_TF_deterministic():
         :return:
         """
         sigma = 0.0
-        M = self.dims[dim]
+        M = self.size_per_dim[dim]
         for j in range(M):
-            m, S = self.posterior.get_vector_distribution(dim, j)
+            m, S = self.model.q_posterior.find(dim, j)
             sigma += np.trace(S) + np.dot(m, m)
         self.pSigma[dim] = sigma/(M*self.D)
 
     def estimate_expected_derivative(self, y, meanf, covS) :
         first_derivative = 0.0
         snd_derivative = 0.0
-        s = self.likelihood_param
+        s = self.model.p_likelihood.params
 
         for k2 in range(self.k2):
             f = probs.sample("normal", (meanf, covS))
@@ -313,7 +304,7 @@ class SSVI_TF_deterministic():
         uis = np.ones((self.D,))
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior
-            (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
+            (mi, Si) = self.model.q_posterior.find(otherdims[dim], col)
             uis = np.multiply(uis, mi)
         return uis
 
@@ -321,7 +312,7 @@ class SSVI_TF_deterministic():
         uis = np.ones((self.D,))
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior
-            (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
+            (mi, Si) = self.model.q_posterior.find(otherdims[dim], col)
             uj_sample = np.random.multivariate_normal(mi, Si)
             uis = np.multiply(uis, uj_sample)
 
@@ -338,7 +329,7 @@ class SSVI_TF_deterministic():
         dec = 4
 
         print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
-              .format(iteration, np.around(current - start,2),\
+              .format(iteration, np.rint(current - start),\
               np.around(self.evaluate_test_error(), dec),\
               np.around(self.evaluate_train_error(), dec), \
               np.around(mean_change, dec),\
@@ -386,8 +377,8 @@ class SSVI_TF_deterministic():
         """
         max_mean_change = 0
         max_cov_change  = 0
-        for dim in range(len(self.dims)):
-            for col in range(self.dims[dim]):
+        for dim in range(len(self.size_per_dim)):
+            for col in range(self.size_per_dim[dim]):
                 mean_change, cov_change = self.norm_changes[dim][col, :]
                 max_mean_change = max(max_mean_change, mean_change)
                 max_cov_change  = max(max_cov_change, cov_change)
@@ -455,7 +446,7 @@ class SSVI_TF_deterministic():
         all_Cs = np.ones((self.D, self.D, ndim))
 
         for dim, i in enumerate(entry):
-            mi, Ci = self.posterior.get_vector_distribution(dim, i)
+            mi, Ci = self.model.q_posterior.find(dim, i)
             m = np.multiply(m, mi)
             S = np.multiply(S, Ci)
 
@@ -491,11 +482,11 @@ class SSVI_TF_deterministic():
         return np.sum(np.multiply(probs, np.array(k_array)))/sum_probs
 
     def predict_entry(self, entry):
-        # If not count-valued tensor
+        # If not count-valued data
         if self.likelihood_type != "poisson":
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):
-                m, _ = self.posterior.get_vector_distribution(dim, col)
+                m, _ = self.model.q_posterior.find(dim, col)
                 u = np.multiply(u, m)
             m = np.sum(u)
             return self.predict_y_given_m(m)

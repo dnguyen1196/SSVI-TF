@@ -1,26 +1,35 @@
 import numpy as np
-from scipy.stats import norm
+from Probability.ProbFun import sigmoid
+from scipy.stats import bernoulli
+
 
 class BernoulliDistribution(object):
     def __init__(self):
         return
 
-    def pdf(self, y, m, s):
-        return norm.pdf(y, m, s)
+    @staticmethod
+    def pdf(self, y, m):
+        return bernoulli.pmf((y+1)/2, sigmoid(m))
 
-    def fst_derivative_pdf(self, y, m, s):
-        return
+    @staticmethod
+    def fst_derivative_pdf(self, y, m):
+        return y * sigmoid(m) * (1 - sigmoid(m))
 
-    def snd_derivative_pdf(self, y, m, s):
-        return
+    @staticmethod
+    def snd_derivative_pdf(self, y, m):
+        s = sigmoid(m)
+        return y * np.square(1 - s) * s - y * np.square(s) * (1 - s)
 
-    def log_pdf(self, y, m, s):
-        return
+    @staticmethod
+    def log_pdf(self, y, m):
+        return y * (1 - sigmoid(y * m))
 
-    def fst_derivative_log_pdf(self, y, m, s):
-        return
+    @staticmethod
+    def fst_derivative_log_pdf(self, y, m):
+        return y * (1 - sigmoid(y * m))
 
-    def snd_derivative_log_pdf(self, y, m, s):
-        return
+    @staticmethod
+    def snd_derivative_log_pdf(self, y, m):
+        return -np.square(y) * sigmoid(y * m) * sigmoid(-y * m)
 
 

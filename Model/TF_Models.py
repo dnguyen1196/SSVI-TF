@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ApproximatePosteriorParams(object):
+class Posterior_Full_Covariance(object):
     def __init__(self, dims, D, initMean=None, initCov=None):
         self.dims = dims
         self.D    = D

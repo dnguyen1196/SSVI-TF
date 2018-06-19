@@ -1,7 +1,7 @@
 import numpy as np
 
-from Model.TF_Models import ApproximatePosteriorParams
-from SSVI.SSVI_TF_deterministic import SSVI_TF_deterministic
+from Model.TF_Models import Posterior_Full_Covariance
+from SSVI.SSVI_TF_d import SSVI_TF_d
 from Tensor.Tensor import Tensor
 
 # np.random.seed(seed=317) # For control and comparisons
@@ -26,7 +26,7 @@ cov0 = np.eye(D)
 
 mean_update = "S"
 cov_update  = "N"
-factorizer = SSVI_TF_deterministic(tensor, rank=D, \
+factorizer = SSVI_TF_d(tensor, rank=D, \
                                    mean_update=mean_update, cov_update=cov_update, \
                                    mean0=mean0, cov0=cov0)
 factorizer.factorize(report=50)
