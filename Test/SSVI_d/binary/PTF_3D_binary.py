@@ -1,8 +1,8 @@
 import numpy as np
 
-from Model.TF_Models import SSVI_TF_d, distribution
-from SSVI.SSVI_TF_d import H_SSVI_TF_2d
-from Tensor.Tensor import tensor
+from Model.TF_Models import ApproximatePosteriorParams
+from SSVI.SSVI_TF_deterministic import SSVI_TF_deterministic
+from Tensor.Tensor import Tensor
 
 
 # Generate synthesize tensor, true, this is what we try to recover
@@ -10,7 +10,7 @@ dims        = [50, 50, 50]
 hidden_D    = 20
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
-data        = tensor(datatype="binary")
+data        = Tensor(datatype="binary")
 
 data.synthesize_binary_data(dims, hidden_D, 0.5, 0.1)
 
@@ -20,21 +20,16 @@ data.synthesize_binary_data(dims, hidden_D, 0.5, 0.1)
 # Generate a simple TF_model
 
 D = 20
-p_likelihood = distribution("bernoulli", 1, None, None)
 
 # Approximate posterior initial guess
-approximate_mean_0 = np.ones((D,)) * 0
-approximate_cov_0 = np.eye(D)
-q_posterior = distribution("normal", dims, ("mean", "cov"), (approximate_mean_0, approximate_cov_0))
-
-# Model prior
-m = np.zeros((D,))
-S = np.eye(D)
-p_prior = distribution("normal", 1, ("mean", "sigma"), (m, S))
-model = SSVI_TF_d(p_likelihood, q_posterior, p_prior, likelihood_type="bernoulli")
+mean0 = np.ones((D,)) * 0
+cov0 = np.eye(D)
 
 ############################### FACTORIZATION ##########################
 mean_update = "S"
 cov_update  = "N"
-factorizer  = H_SSVI_TF_2d(model, data, rank=D, mean_update=mean_update, cov_update=cov_update)
+factorizer = SSVI_TF_deterministic(data, rank=D, \
+                                   mean_update=mean_update, cov_update=cov_update, \
+                                   mean0=mean0, cov0=cov0)
+
 factorizer.factorize(report=100)

@@ -1,20 +1,24 @@
 import Probability.ProbFun as probs
+from Probability.normal import NormalDistribution
+from Probability.bernoulli import BernoulliDistribution
+from Probability.poisson import PoissonDistribution
+
 import numpy as np
 from numpy.linalg import inv
 import time
 
 """
-SSVI_TF_GME.py
+SSVI_TF_sub_optimal.py
 
-An extension over the SSVI_TF_d model where we add another layer of noise
+An extension over the SSVI_TF_d posterior where we add another layer of noise
 Theoretically should provide a better results than SSVI_TF_d 
 
 """
-class H_SSVI_TF():
+class SSVI_TF_robust():
     def __init__(self, model, tensor, rank, rho_cov, k1=1, k2=10, scheme="adagrad", batch_size=5):
         """
-        :param model: the generative model behind factorization, must be
-                    SSVI_TF_d model
+        :param model: the generative posterior behind factorization, must be
+                    SSVI_TF_d posterior
         :param tensor:
         :param rank:
         :param rho_cov: step size formula for covariance parameter
@@ -43,10 +47,13 @@ class H_SSVI_TF():
 
         if self.likelihood_type == "normal":
             self.link_fun = lambda m : m
+            self.probs    = NormalDistribution()
         elif self.likelihood_type == "bernoulli":
             self.link_fun = lambda m : probs.sigmoid(m)
+            self.probs    = BernoulliDistribution()
         elif self.likelihood_type == "poisson":
             self.link_fun = lambda m : np.log(1 + np.exp(-m))
+            self.probs    = PoissonDistribution()
 
         # optimization scheme
         self.time_step = [1 for _ in range(self.order)]
@@ -142,7 +149,6 @@ class H_SSVI_TF():
 
         # Store the update in memory
         self.model.q_posterior.update(dim, i, (m, S))
-
 
     def compute_update_mean_param(self, dim, i, m, mGrad):
         """
@@ -241,6 +247,24 @@ class H_SSVI_TF():
             sigma += np.trace(S) + np.dot(m, m)
         self.pSigma[dim] = sigma/(M*self.D)
 
+    def approximate_likelihood(self, mf, sf):
+        fij = np.random.normal(mf, sf, (self.k2, ))
+
+
+    def approximate_expected_likelihood(self, m, S, othercols, otherdims):
+        # TODO:
+
+        return
+
+    def approximate_expected_fst_derivative_phi(self, m, S, othercols, otherdims):
+        # TODO;
+        return
+
+    def approximate_expected_snd_derivative_phi(self, m, S, othercols, otherdims):
+        # TODO
+
+        return
+
     def expected_log_likelihood_and_derivatives(self, y, meanf, covS, alpha) :
         """
 
@@ -256,15 +280,15 @@ class H_SSVI_TF():
         s = self.model.p_likelihood.params
 
         for k2 in range(self.k2):
-            f = probs.sample("normal", (meanf, covS + alpha))
-            snd_derivative   += probs.snd_derivative(self.likelihood_type, (y, f, s))
-            first_derivative += probs.fst_derivative(self.likelihood_type, (y, f, s))
-            log_likelihood   += probs.log_likelihood(self.likelihood_type, (y, f, s))
+            f = np.random.normal(meanf, covS + alpha)
+            snd_derivative   += self.probs.snd_derivative_log_pdf(y, f, s)
+            first_derivative += self.probs.fst_derivative_log_pdf(y, f, s)
+            log_likelihood   += self.probs.log_pdf(y, f, s)
 
         return first_derivative/self.k2, snd_derivative/self.k2, log_likelihood/self.k2
 
     def compute_expected_log_likelihood(self, y, meanf, covS, alpha):
-
+        # TODO
         return
 
     def compute_expected_uis_product(self, othercols, otherdims):
@@ -280,7 +304,7 @@ class H_SSVI_TF():
         for dim, col in enumerate(othercols):
             # Sample from the approximate posterior
             (mi, Si) = self.model.q_posterior.find(otherdims[dim], col)
-            uj_sample = probs.sample("multivariate_normal", (mi, Si))
+            uj_sample = np.random.multivariate_normal(mi, Si)
             uis = np.multiply(uis, uj_sample)
         return uis
 
@@ -320,8 +344,6 @@ class H_SSVI_TF():
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
             elif self.likelihood_type == "bernoulli":
-                # if predict != correct:
-                #     print ("errror: ", predict, correct)
                 error += 1 if predict != correct else 0
             else:
                 return 0
@@ -332,7 +354,7 @@ class H_SSVI_TF():
             return m
         elif self.likelihood_type == "poisson":
             f = self.link_fun(m)
-            # TODO: implement Gauss-Hermite quadrature
+            # TODO: Copy this from working implementation
 
 
             return 1

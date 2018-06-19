@@ -5,8 +5,9 @@ needed in data representation and storage.
 """
 import  numpy as np
 import time
+from Probability import ProbFun as probs
 
-class tensor(object):
+class Tensor(object):
     def  __init__(self, datatype="real", binary_cutoff=0.0):
         """
         :param datatype:
@@ -15,18 +16,16 @@ class tensor(object):
         assert(datatype in ["real", "ordinal", "count", "binary"])
 
         self.datatype = datatype
+
         if self.datatype == "real":
             self.link_fun = lambda m : m
         elif self.datatype == "binary":
-            self.link_fun = lambda m : 1. / (1. + np.exp(-m))
+            self.link_fun = lambda x : probs.sigmoid(x)
             self.binary_cutoff = binary_cutoff
         elif self.datatype == "count":
-            self.max_count = 0
-            self.min_count = 100
-            self.link_fun = lambda m : np.log(1 + np.exp(m))
+            self.link_fun = lambda m : probs.poisson_link(m)
 
-    # synthesize data according to some model
-    def synthesize(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
+    def synthesize_real_data(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
         """
         :param dims:
         :param means:
@@ -39,47 +38,7 @@ class tensor(object):
         print("Generating synthetic data ... ")
         start = time.time()
         self.dims = dims
-
-        ndim = len(dims)
-        matrices = [[]] * ndim
-        # Generate the random hidden matrices
-        for i in range(ndim):
-            matrices[i] = self.create_random_matrix(dims[i], D, means[i], covariances[i])
-
-        total         = np.prod(dims) # Total number of possible entries
-        observed_num  = int(total * sparsity) # Number of observed_by_id entries
-        train_size    = int(observed_num * train) # training set size
-
-        observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices)
-
-        self.test_entries  = observed_entries[train_size :]
-        self.test_vals     = observed_vals[train_size :]
-        self.train_entries = observed_entries[: train_size]
-        self.train_vals    = observed_vals[: train_size]
-
-        if self.datatype == "binary":
-            num_ones = np.sum(self.test_vals)
-            num_minus = (len(self.test_vals) -  num_ones)/2
-            print("There are: ", num_minus, " -1's value out of ", len(self.test_vals), " test values")
-
-        # self.verify_binary_entries(matrices)
-        end = time.time()
-        print("Generating synthetic data took: ", end- start)
-
-    def synthesize_real_data(self, dims, means, covariances, D, train, sparsity):
-        """
-        :param dims:
-        :param means:
-        :param covariances:
-        :param D:
-        :param train:
-        :param sparsity:
-        :return:
-        """
-        print("Generating synthetic data ... ")
-        start = time.time()
-        self.dims = dims
+        self.datatype = "real"
 
         ndim = len(dims)
         matrices = [[]] * ndim
@@ -106,6 +65,7 @@ class tensor(object):
         print("Generating synthetic data ... ")
         start = time.time()
         self.dims = dims
+        self.datatype = "binary"
 
         ndim = len(dims)
         matrices = [[]] * ndim
@@ -134,7 +94,6 @@ class tensor(object):
 
     def synthesize_count_data(self, dims, D, train, sparsity):
         """
-
         :param dims:
         :param D:
         :param train:
@@ -144,6 +103,9 @@ class tensor(object):
         print("Generating synthetic data ... ")
         start = time.time()
         self.dims = dims
+        self.datatype = "count"
+        self.min_count = 100
+        self.max_count = 0
 
         ndim = len(dims)
         matrices = [[]] * ndim
@@ -170,7 +132,6 @@ class tensor(object):
         end = time.time()
         print("Generating synthetic data took: ", end- start)
         print("max count is: ", self.max_count)
-
 
     def create_random_matrix(self, nrow, ncol, m, S):
         """
@@ -220,10 +181,7 @@ class tensor(object):
             return 1 if m >= self.binary_cutoff else -1
         elif self.datatype == "count":
             f = self.link_fun(m)
-            # x = np.random.poisson(f)
             x = int(np.rint(f))
-            # print(f, x)
-
             self.max_count = max(self.max_count, x)
             self.min_count = min(self.min_count, x)
             return x
@@ -262,7 +220,6 @@ class tensor(object):
             id -= size * k
         return coord
 
-    # TODO: implement
     def load_data(self, filename):
         """
         :param filename: 

@@ -8,12 +8,12 @@ from math import log10, floor
 import time
 
 """
-SSVI_TF_simple.py
+SSVI_TF_diag.py
 SSVI algorithm to learn the hidden matrix factors behind data
 factorization
-The 'simple algorithm' -> no covariance update
+The 'simple algorithm' -> assuming diagonal covariance
 """
-class SSVI_TF_simple():
+class SSVI_TF_diag():
     def __init__(self, model, tensor, rank, mean_update="S", cov_update="N", k1=10, k2=10, batch_size=100):
 
         self.model      = model

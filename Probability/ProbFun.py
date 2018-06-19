@@ -52,7 +52,7 @@ def normal_snd_log_derivative(y, f, s):
 
 
 """
-Bernoulli distribution (binary-valued tensor)
+Bernoulli distribution (binary-valued data)
 """
 def bernoulli_sample(f, s=None):
     return np.random.binomial(1, sigmoid(f))
@@ -65,7 +65,7 @@ def bernoulli_snd_derivative(y, f, s=None):
 
 
 """
-Poisson distribution (count-valued tensor)
+Poisson distribution (count-valued data)
 """
 def poisson_sample(f, s=None):
     return np.random.poisson(f)

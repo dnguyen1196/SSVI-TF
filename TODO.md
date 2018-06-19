@@ -1,13 +1,25 @@
+# Have another implementation for suboptimal bound
+- Check if there is a closed form update for the case of complete conditional 
+
+
+# Check the code for robust TF
+- Reimplement the gradient computation according to the new formulas
+- First start by writing down what i need to estimate (looks like a lot 
+can be reused)
+- Then implement
+
+# Implement function to do batch computations of derivatives
+
+
+# 
+- sigma**2 vs just sigma (take note of this in current implementation)
+
 # Additional implementation
 - Why is the NLL increasing instead of decreasing
 - And while the NLL is increasing, why does the error decreasing,
 (May be the NLL is not an accurate indicator of the algorithm's performance?) 
 - Implement function to compute the VLB
 
-# Have another implementation for suboptimal bound
-
-# Check the code for robust TF
-- Reimplement the gradient computation according to the new formulas
 
 # Fix poisson prediction
 - Look at the actual prediction that the algorithm outputs
@@ -16,5 +28,9 @@
 RuntimeWarning: invalid value encountered in double_scalars
 The above problem seems to happen with "big" stepsize
 
-# approximation vs sampling
+# numerical approximation vs sampling
 - Is it better to do approximation or sampling
+
+
+
+
