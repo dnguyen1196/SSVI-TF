@@ -35,10 +35,12 @@ class SSVI_TF_deterministic():
             self.link_fun = lambda m : m
             self.likelihood_type = "normal"
             self.likelihood_param = 1
+            self.probs = NormalDistribution()
         elif self.datatype == "binary":
             self.link_fun = lambda m : probs.sigmoid(m)
             self.likelihood_type = "bernoulli"
             self.likelihood_param = 0 # Not used
+            self.probs = BernoulliDistribution()
 
         elif self.datatype == "count":
             self.likelihood_type = "poisson"
@@ -48,6 +50,7 @@ class SSVI_TF_deterministic():
             self.hermite_points, self.hermite_weights = np.polynomial.hermite.hermgauss(self.herm_degree)
             self.link_fun = lambda m : probs.poisson_link(m)
             self.likelihood_param = 0 # Not used
+            self.probs = PoissonDistribution()
 
         # optimization scheme
         self.time_step = [1 for _ in range(self.order)]
