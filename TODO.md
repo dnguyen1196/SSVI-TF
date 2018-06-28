@@ -19,9 +19,6 @@ can be reused)
 - sigma**2 vs just sigma (take note of this in current implementation)
 
 # Additional implementation
-- Why is the NLL increasing instead of decreasing
-- And while the NLL is increasing, why does the error decreasing,
-(May be the NLL is not an accurate indicator of the algorithm's performance?) 
 - Implement function to compute the VLB
 
 

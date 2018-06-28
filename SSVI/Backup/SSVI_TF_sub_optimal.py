@@ -139,7 +139,7 @@ class SSVI_TF_sub_optimal():
             # if self.likelihood_type == "normal": # Case of complete conditional
             #     (dij, Dij) = self.compute_di_Di_si_complete_conditional(dim, i, coord, y, m, S)
             # else:
-            (dij, Dij, sij) = self.estimate_di_Di(dim, i, coord, y, m, S)
+            (dij, Dij, sij) = self.estimate_di_Di_si(dim, i, coord, y, m, S)
 
             Di_acc += Dij
             di_acc += dij
@@ -264,7 +264,7 @@ class SSVI_TF_sub_optimal():
         di = y/s * d_acc - 1./s * np.inner(D_acc, mui)
         return di, Di
 
-    def estimate_di_Di(self, dim, i, coord, y, m, S):
+    def estimate_di_Di_si(self, dim, i, coord, y, m, S):
         """
         :param dim:
         :param i:

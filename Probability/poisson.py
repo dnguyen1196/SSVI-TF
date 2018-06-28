@@ -3,6 +3,7 @@ from Probability.ProbFun import poisson_link, sigmoid
 from scipy.stats import poisson
 from scipy.misc import factorial
 
+
 class PoissonDistribution(object):
     def __init__(self):
         return

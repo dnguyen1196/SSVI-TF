@@ -183,9 +183,8 @@ class SSVI_TF(object):
             # Sample from the approximate posterior
             (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
 
-            # TODO: check dimension of Si
+            # TODO: check dimension of Si. why?
             uj_sample = np.random.multivariate_normal(mi, Si)
-
             uis = np.multiply(uis, uj_sample)
         return uis
 
