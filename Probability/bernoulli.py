@@ -7,6 +7,9 @@ class BernoulliDistribution(object):
     def __init__(self):
         return
 
+    def __str__(self):
+        return "BernoulliDistribution"
+
     @staticmethod
     def pdf(self, y, m):
         return bernoulli.pmf((y+1)/2, sigmoid(m))

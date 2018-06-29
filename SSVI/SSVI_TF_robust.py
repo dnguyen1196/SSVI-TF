@@ -16,6 +16,10 @@ class SSVI_TF_robust(SSVI_TF):
         self.pSigma_inv      = np.eye(self.D)
         self.posterior       = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0)
 
+        self.w_tau = 1.
+        self.w_sigma = 1.
+        self.w_ada_grad = 0.
+
     def initialize_di_Di_si(self):
         Di = np.zeros((self.D, self.D))
         di = np.zeros((self.D,))
@@ -46,15 +50,20 @@ class SSVI_TF_robust(SSVI_TF):
         si          = 0.
 
         for k1 in range(self.k1):
-            ui = self.sample_vjs(othercols, otherdims)
+            vjs = self.sample_vjs(othercols, otherdims)
             w  = np.random.rayleigh(np.square(self.w_sigma))
 
-            meanf     = np.dot(ui, m)
-            covS     = np.dot(ui, np.inner(S, ui)) + w
+            meanf     = np.dot(vjs, m)
+            covS     = np.dot(vjs, np.inner(S, vjs)) + w
             pdf, pdf_1st, pdf_2nd = self.approximate_expected_derivative_pdf(y, meanf, covS)
 
-            delta_phi = ui * pdf_1st
-            delta_squared_phi = np.outer(ui, ui) * pdf_2nd
+            # print(vjs)
+            # print(pdf_1st)
+            # print(pdf)
+            # print(pdf_2nd)
+
+            delta_phi = vjs * pdf_1st
+            delta_squared_phi = np.outer(vjs, vjs) * pdf_2nd
             delta_log_phi = 1/pdf * delta_phi
             delta_squared_log_phi = 1/ pdf * (delta_squared_phi - 1/ pdf * np.outer(delta_phi, delta_phi))
 
@@ -70,32 +79,73 @@ class SSVI_TF_robust(SSVI_TF):
         pdf_prime = 0.
         pdf_double_prime = 0.
         s = self.likelihood_param
-        for fij in fs:
-            pdf += 1/self.k2 * self.likelihood.pdf(y, fij, s)
-            pdf_prime += 1/self.k2 * self.likelihood.fst_derivative_pdf(y, fij, s)
-            pdf_double_prime += 1/self.k2 * self.likelihood.snd_derivative_pdf(y, fij, s)
+        for f in fs:
+            print("y = ", y, "fij = ", f, " meanf = ", meanf, " varf = ", varf)
+            print("pdf = ", self.likelihood.pdf(y, f, s), "pdf' = ", self.likelihood.fst_derivative_pdf(y, f, s))
+            pdf += 1/self.k2 * self.likelihood.pdf(y, f, s)
+            pdf_prime += 1/self.k2 * self.likelihood.fst_derivative_pdf(y, f, s)
+            pdf_double_prime += 1/self.k2 * self.likelihood.snd_derivative_pdf(y, f, s)
         return pdf, pdf_prime, pdf_double_prime
 
-    def estimate_expected_derivative(self, y, meanf, covS) :
-        first_derivative = 0.0
-        snd_derivative = 0.0
-        s = self.likelihood_param
-
-        for k2 in range(self.k2):
-            f = np.random.normal(meanf, covS)
-            snd_derivative += self.likelihood.snd_derivative_log_pdf(y, f, s)
-            first_derivative += self.likelihood.fst_derivative_log_pdf(y, f, s)
-
-        return first_derivative/self.k2, snd_derivative/self.k2
-
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
-        raise NotImplementedError
+        if self.mean_update == "S":
+            meanGrad = (np.inner(self.pSigma_inv, self.pmu - m) + di_acc)
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            m_next = m + np.multiply(meanStep, meanGrad)
+        elif self.mean_update == "N":
+            C = np.inner(inv(S), m)
+            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc - 2 * np.inner(Di_acc, m)
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
+            m_next   = np.inner(S, C_next)
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return m_next
 
     def update_cov_param(self, dim, i, m, S, di_acc, Di_acc):
-        raise NotImplementedError
+        if self.cov_update == "S":
+            L = cholesky(S)
+            covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
+                      - np.inner(L, self.pSigma_inv) + 2 * np.inner(L, Di_acc))
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            L_next  = L + covStep * covGrad
+            S_next  = np.inner(L, np.transpose(L))
+        elif self.cov_update == "N":
+            covGrad = (self.pSigma_inv - 2 * Di_acc)
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return S_next
 
     def update_sigma_param(self, si_acc, scale):
-        raise NotImplementedError
+        w_grad = -1/(2 * np.square(self.w_tau)) + 1/ (4 * np.square(self.w_sigma)) * si_acc
+        w_step = self.compute_stepsize_sigma_param(w_grad)
+        update = (1-w_step) * (-1/np.square(self.w_sigma)) + w_step * w_grad
+        self.w_sigma = np.sqrt(-1/update)
+
+    def compute_stepsize_mean_param(self, dim, i, mGrad):
+        acc_grad = self.ada_acc_grad[dim][:, i]
+        grad_sqr = np.square(mGrad)
+        self.ada_acc_grad[dim][:, i] += grad_sqr
+
+        # return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        if self.likelihood_type != "poisson":
+            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        else:
+            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+
+    def compute_stepsize_cov_param(self, dim, i, covGrad):
+        if self.likelihood_type == "poisson":
+            return 1/(self.time_step[dim]+100)
+        return 1/(self.time_step[dim] + 1)
+
+    def compute_stepsize_sigma_param(self, w_grad):
+        self.w_ada_grad += np.square(w_grad)
+        w_step = self.eta / self.w_ada_grad
+        return w_step
 
     def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
-        raise NotImplementedError
+        mean_change = np.linalg.norm(m_next - m)
+        cov_change  = np.linalg.norm(S_next - S, 'fro')
+        self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])

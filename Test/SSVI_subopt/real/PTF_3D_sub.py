@@ -1,6 +1,7 @@
 import numpy as np
 
-from SSVI.Backup.SSVI_TF_sub_optimal import SSVI_TF_sub_optimal
+# from SSVI.Backup.SSVI_TF_sub_optimal import SSVI_TF_sub_optimal
+from SSVI.SSVI_TF_simple import SSVI_TF_simple
 from Tensor.Tensor import Tensor
 
 np.random.seed(seed=317) # For control and comparison
@@ -24,7 +25,7 @@ cov0 = np.eye(D)
 mean_update = "S"
 cov_update  = "N"
 
-factorizer = SSVI_TF_sub_optimal(data, rank=D, \
+factorizer = SSVI_TF_simple(data, rank=D, \
                                    mean_update=mean_update, cov_update=cov_update, \
                                    mean0=mean0, cov0=cov0)
 

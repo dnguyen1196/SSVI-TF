@@ -8,6 +8,9 @@ class PoissonDistribution(object):
     def __init__(self):
         return
 
+    def __str__(self):
+        return "PoissonDistribution"
+
     @staticmethod
     def pdf(self, y, m):
         return poisson.pmf(y, poisson_link(m))
