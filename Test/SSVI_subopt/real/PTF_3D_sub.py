@@ -1,13 +1,12 @@
 import numpy as np
 
-# from SSVI.Backup.SSVI_TF_sub_optimal import SSVI_TF_sub_optimal
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 from Tensor.Tensor import Tensor
 
 np.random.seed(seed=317) # For control and comparison
 # Generate synthesize data, true, this is what we try to recover
 
-dims     = [20, 20, 20]
+dims     = [10, 10, 10]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]

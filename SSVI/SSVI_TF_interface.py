@@ -68,6 +68,10 @@ class SSVI_TF(object):
         self.ada_acc_cov = [np.zeros((self.D, self.D, s)) for s in self.dims]
         self.eta = 1
         self.poisson_eta = 0.1
+        self.cov_eta = 1
+
+        self.cov_stepsize = 1
+        self.cov_stepsize_pois = 100
 
         # keep track of changes in norm
         self.norm_changes = [np.ones((s, 2)) for s in self.dims]
@@ -135,6 +139,8 @@ class SSVI_TF(object):
         m_next   = self.update_mean_param(dim, i, m, S, di, Di)
         self.update_sigma_param(si, scale)
 
+        # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
+
         # Measures the change in the parameters from previous iterations
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
@@ -161,21 +167,71 @@ class SSVI_TF(object):
     def estimate_di_Di_si(self, dim, i, coord, y, m, S):
         raise NotImplementedError
 
-    @abstractmethod
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
-        raise NotImplementedError
+        if self.mean_update == "S":
+            meanGrad = (np.inner(self.pSigma_inv, self.pmu - m) + di_acc)
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            m_next = m + np.multiply(meanStep, meanGrad)
+        elif self.mean_update == "N":
+            C = np.inner(inv(S), m)
+            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc - 2 * np.inner(Di_acc, m)
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
+            m_next   = np.inner(S, C_next)
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return m_next
 
-    @abstractmethod
-    def update_cov_param(self, dim, i, m, S, di_acc, Di_acc):
-        raise NotImplementedError
+    def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
+        if self.cov_update == "S":
+            L = cholesky(S)
+            covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
+                      - np.inner(L, self.pSigma_inv) + 2 * np.inner(L, Di_acc))
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            L_next  = L + covStep * covGrad
+            S_next  = np.inner(L, np.transpose(L))
+        elif self.cov_update == "N":
+            covGrad = (self.pSigma_inv - 2 * Di_acc)
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return S_next
 
-    @abstractmethod
     def update_sigma_param(self, si_acc, scale):
-        raise NotImplementedError
+        w_grad = -1/(2 * np.square(self.w_tau)) + 1/ (4 * np.square(self.w_sigma)) * si_acc
+        w_step = self.compute_stepsize_sigma_param(w_grad)
+        update = (1-w_step) * (-1/np.square(self.w_sigma)) + w_step * w_grad
+        self.w_sigma = np.sqrt(-1/update)
 
-    @abstractmethod
+    def compute_stepsize_mean_param(self, dim, i, mGrad):
+        acc_grad = self.ada_acc_grad[dim][:, i]
+        grad_sqr = np.square(mGrad)
+        self.ada_acc_grad[dim][:, i] += grad_sqr
+
+        # return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        if self.likelihood_type != "poisson":
+            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        else:
+            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+
+    def compute_stepsize_cov_param(self, dim, i, covGrad):
+        if self.likelihood_type == "poisson":
+            return self.cov_eta/(self.time_step[dim] + self.cov_stepsize_pois)
+        return self.cov_eta/(self.time_step[dim] + self.cov_stepsize)
+
+    def compute_stepsize_sigma_param(self, w_grad):
+        self.w_ada_grad += np.square(w_grad)
+        w_step = self.eta / self.w_ada_grad
+        return w_step
+
     def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
-        raise NotImplementedError
+        mean_change = np.linalg.norm(m_next - m)
+        if S.ndim != 1:
+            cov_change  = np.linalg.norm(S_next - S, 'fro')
+        else:
+            cov_change  = np.linalg.norm(S_next - S)
+        self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
 
     def sample_vjs(self, othercols, otherdims):
         uis = np.ones((self.D,))
@@ -183,8 +239,11 @@ class SSVI_TF(object):
             # Sample from the approximate posterior
             (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
 
-            # TODO: check dimension of Si. why?
-            uj_sample = np.random.multivariate_normal(mi, Si)
+            if Si.ndim == 1:
+                uj_sample = np.random.multivariate_normal(mi, np.diag(Si))
+            else:
+                uj_sample = np.random.multivariate_normal(mi, Si)
+
             uis = np.multiply(uis, uj_sample)
         return uis
 
