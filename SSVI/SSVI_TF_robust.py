@@ -6,7 +6,7 @@ from numpy.linalg import inv
 
 class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                 mean0=None, cov0=None, sigma0=1,k1=20, k2=10, batch_size=100, eta=0.05, cov_eta=.000001):
+                 mean0=None, cov0=None, sigma0=1,k1=50, k2=50, batch_size=100, eta=0.05, cov_eta=.000001):
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
                  mean0, cov0, sigma0,k1, k2, batch_size)
@@ -23,6 +23,7 @@ class SSVI_TF_robust(SSVI_TF):
         # Override the eta constant in adagrad
         self.eta = eta
         self.cov_eta = cov_eta
+        self.noise_added = True
 
     def initialize_di_Di_si(self):
         Di = np.zeros((self.D, self.D))
@@ -53,8 +54,10 @@ class SSVI_TF_robust(SSVI_TF):
         Di          = np.zeros((self.D, self.D))
         si          = 0.
 
+        vjs_batch = self.sample_vjs_batch(othercols, otherdims, self.k1)
+
         for k1 in range(self.k1):
-            vjs = self.sample_vjs(othercols, otherdims)
+            vjs = vjs_batch[k1, :]
             w   = np.random.rayleigh(np.square(self.w_sigma))
 
             meanf     = np.dot(vjs, m)

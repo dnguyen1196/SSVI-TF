@@ -1,0 +1,21 @@
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.008248567581176758
+Tensor dimensions:  [10, 10, 10]
+Optimization metrics:
+Mean update scheme:  N
+Covariance update :  N
+k1 samples =  20  k2 samples =  10
+eta =  0.05  cov eta =  1e-06
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+    50       100.31     0.1792     0.2424     0.1452     0.0399
+   100       202.22     0.1528     0.1968     0.1241     0.0296
+   150       303.98     0.1458     0.1712     0.0968     0.0165
+   200       405.79     0.1453     0.1547     0.092      0.0139
+   250       507.86     0.1519     0.1436     0.0843     0.0095
+   300       609.57     0.1581     0.1374     0.0863     0.0104
+   350       711.43      0.17      0.1436     0.065      0.007
+   400       813.9      0.1845     0.1571     0.0639     0.0064
+   450       915.32     0.198      0.1757     0.0702     0.0046
+   500      1018.67     0.216      0.1955     0.0663     0.004
+   550      1120.34     0.2361     0.2138     0.0543     0.0038

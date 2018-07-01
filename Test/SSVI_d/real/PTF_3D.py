@@ -32,4 +32,4 @@ cov_update  = "N"
 factorizer = SSVI_TF_d(tensor, rank=D, \
                            mean_update=mean_update, cov_update=cov_update, \
                            mean0=mean0, cov0=cov0)
-factorizer.factorize(report=100)
+factorizer.factorize(report=10)

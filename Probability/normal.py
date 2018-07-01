@@ -12,13 +12,13 @@ class NormalDistribution(object):
 
     def pdf(self, y, m, s):
         res = norm.pdf(y, m, s)
-        return max(res, self.epsilon)
+        return np.max(res, self.epsilon)
 
     def fst_derivative_pdf(self, y, m, s):
         return -self.pdf(y, m, s) * (y - m) / s
 
     def snd_derivative_pdf(self, y, m, s):
-        return self.pdf(y, m, s) * (np.square((y-m)/s) - 1/s)
+        return np.multiply(self.pdf(y, m, s), (np.square((y-m)/s) - 1/s))
 
     def log_pdf(self, y, m, s):
         return np.log(self.pdf(y, m, s))
@@ -27,6 +27,6 @@ class NormalDistribution(object):
         return 1/np.square(s) * (y - m)
 
     def snd_derivative_log_pdf(self, y, m, s):
-        return -1/np.square(s)
+        return -1/np.square(s) * np.ones_like(m)
 
 

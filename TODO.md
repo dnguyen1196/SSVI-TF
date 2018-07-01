@@ -5,9 +5,14 @@
   + N - N update causes error to decrease :|
   
 - Do safe division with log
+- The error decreases and then increases? -> constant is not 'optimal?'
+- Change how I do sampling? -> 1 giant sampling?
 
 # Implement a common interface
-
+- Implement a common estimate_di_Di_si function
+- Switch to batch processing including sampling 
+- Then we need to update the probability classes
+- This might be faster
 
 # Have another implementation for suboptimal bound
 

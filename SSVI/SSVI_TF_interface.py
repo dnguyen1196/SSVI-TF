@@ -16,7 +16,7 @@ import time
 
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                 mean0=None, cov0=None, sigma0=1,k1=20, k2=10, batch_size=100):
+                 mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=100):
 
         self.tensor = tensor
         self.dims   = tensor.dims
@@ -73,6 +73,7 @@ class SSVI_TF(object):
         self.cov_stepsize = 1
         self.cov_stepsize_pois = 100
 
+        self.noise_added = False
         # keep track of changes in norm
         self.norm_changes = [np.ones((s, 2)) for s in self.dims]
 
@@ -96,7 +97,8 @@ class SSVI_TF(object):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
                 # in the dim-th dimension
-                self.update_natural_params(dim, col, iteration)
+                # self.update_natural_params(dim, col, iteration)
+                self.update_natural_param_batch(dim, col, iteration)
                 self.update_hyper_parameter(dim, iteration)
 
             # Move on to the next column of the hidden matrices
@@ -115,7 +117,6 @@ class SSVI_TF(object):
             observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
             observed_i = np.take(observed_i, observed_idx, axis=0)
 
-        M = len(observed_i)
         (m, S) = self.posterior.get_vector_distribution(dim, i)
         di, Di, si = self.initialize_di_Di_si()
 
@@ -140,7 +141,6 @@ class SSVI_TF(object):
         self.update_sigma_param(si, scale)
 
         # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
-
         # Measures the change in the parameters from previous iterations
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
@@ -159,12 +159,78 @@ class SSVI_TF(object):
 
         self.pSigma[dim] = sigma/(M*self.D)
 
+    def update_natural_param_batch(self, dim, i, iteration):
+        observed = self.tensor.find_observed_ui(dim, i)
+
+        if len(observed) > self.batch_size:
+            observed_idx = np.random.choice(len(observed), self.batch_size, replace=False)
+            observed_subset = np.take(observed, observed_idx, axis=0)
+        else:
+            observed_subset = np.copy(observed)
+
+        (m, S) = self.posterior.get_vector_distribution(dim, i)
+        coords = np.array([entry[0] for entry in observed_subset])
+        ys = np.array([entry[1] for entry in observed_subset])
+
+        di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+
+        scale = len(observed) / min(self.batch_size, len(observed_subset))
+        Di *= scale
+        di *= scale
+        if self.noise_added:
+            si *= scale
+
+        # Compute next covariance and mean
+        S_next   = self.update_cov_param(dim, i, m, S, di, Di)
+        m_next   = self.update_mean_param(dim, i, m, S, di, Di)
+        self.update_sigma_param(si, scale)
+
+        # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
+        # Measures the change in the parameters from previous iterations
+        self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
+        # Update the change
+        self.posterior.update_vector_distribution(dim, i, m_next, S_next)
+
     @abstractmethod
     def initialize_di_Di_si(self):
         raise NotImplementedError
 
     @abstractmethod
     def estimate_di_Di_si(self, dim, i, coord, y, m, S):
+        raise NotImplementedError
+
+    def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
+        num_subsamples     = np.size(coords, axis=0) # Number of subsamples
+
+        othercols_left     = coords[:, : dim]
+        othercols_right    = coords[:, dim + 1 :]
+        othercols_concat   = np.concatenate((othercols_left, othercols_right), axis=1)
+
+        alldims            = list(range(self.order))
+        otherdims          = alldims[:dim]
+        otherdims.extend(alldims[dim + 1 : ])
+
+        # Shape of vjs_batch would be (num_subsamples, k1, D)
+        vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
+
+        assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+
+        ws_batch       = None # Shape will be (num_samples, k1)
+        if self.noise_added:
+            ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
+
+        mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
+        cov_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
+        for num in range(num_subsamples):
+            vs = vjs_batch[num, :, :] # shape (k1, D)
+            cov_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
+
+        di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, cov_batch, ws_batch)
+
+        return di, Di, si
+
+    @abstractmethod
+    def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
         raise NotImplementedError
 
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
@@ -199,6 +265,8 @@ class SSVI_TF(object):
         return S_next
 
     def update_sigma_param(self, si_acc, scale):
+        if not self.noise_added:
+            return
         w_grad = -1/(2 * np.square(self.w_tau)) + 1/ (4 * np.square(self.w_sigma)) * si_acc
         w_step = self.compute_stepsize_sigma_param(w_grad)
         update = (1-w_step) * (-1/np.square(self.w_sigma)) + w_step * w_grad
@@ -233,6 +301,25 @@ class SSVI_TF(object):
             cov_change  = np.linalg.norm(S_next - S)
         self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
 
+    def sample_vjs_batch(self, othercols_concat, otherdims, k):
+        num_subsamples = np.size(othercols_concat, axis=0)
+        vjs_batch = np.ones((num_subsamples, k, self.D))
+
+        for num in range(num_subsamples):
+            othercols = othercols_concat[num, :]
+
+            for dim, col in enumerate(othercols):
+                (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
+
+                if Si.ndim == 1:
+                    vj_sample = np.random.multivariate_normal(mi, np.diag(Si), size=k)
+                else:
+                    vj_sample = np.random.multivariate_normal(mi, Si, size=k)
+
+                vjs_batch[num, :, :] = np.multiply(vjs_batch[num, :, :], vj_sample)
+
+        return vjs_batch
+
     def sample_vjs(self, othercols, otherdims):
         uis = np.ones((self.D,))
         for dim, col in enumerate(othercols):
@@ -245,6 +332,7 @@ class SSVI_TF(object):
                 uj_sample = np.random.multivariate_normal(mi, Si)
 
             uis = np.multiply(uis, uj_sample)
+
         return uis
 
     """
