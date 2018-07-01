@@ -1,9 +1,8 @@
 # Check the code for robust TF
 - The error is increasing, why?
   + Check the normal pdf + derivatives
-  + d mean and d cov decreases for sure
-  + More samples? -> seems not likely
-  +  
+  + More samples? - tried, no improvements yet
+  + N - N update causes error to decrease :|
   
 - Do safe division with log
 

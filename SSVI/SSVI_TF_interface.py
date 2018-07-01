@@ -252,6 +252,12 @@ class SSVI_TF(object):
     """
     def report_metrics(self, iteration, start, mean_change, cov_change):
         if iteration == self.report:
+            print("Tensor dimensions: ", self.dims)
+            print("Optimization metrics: ")
+            print("Mean update scheme: ", self.mean_update)
+            print("Covariance update : ", self.cov_update)
+            print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
+            print("eta = ", self.eta, " cov eta = ", self.cov_eta)
             print("iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |", end=" ")
             if self.likelihood_type == "poisson":
                 print("test_nll | train_nll ")

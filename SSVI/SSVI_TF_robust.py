@@ -6,7 +6,7 @@ from numpy.linalg import inv
 
 class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                 mean0=None, cov0=None, sigma0=1,k1=20, k2=10, batch_size=100):
+                 mean0=None, cov0=None, sigma0=1,k1=20, k2=10, batch_size=100, eta=0.05, cov_eta=.000001):
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
                  mean0, cov0, sigma0,k1, k2, batch_size)
@@ -21,8 +21,8 @@ class SSVI_TF_robust(SSVI_TF):
         self.w_ada_grad = 0.
 
         # Override the eta constant in adagrad
-        self.eta = 0.01
-        self.cov_eta = 0.000001
+        self.eta = eta
+        self.cov_eta = cov_eta
 
     def initialize_di_Di_si(self):
         Di = np.zeros((self.D, self.D))
