@@ -97,8 +97,10 @@ class SSVI_TF(object):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
                 # in the dim-th dimension
+
                 # self.update_natural_params(dim, col, iteration)
                 self.update_natural_param_batch(dim, col, iteration)
+
                 self.update_hyper_parameter(dim, iteration)
 
             # Move on to the next column of the hidden matrices
@@ -177,8 +179,6 @@ class SSVI_TF(object):
         scale = len(observed) / min(self.batch_size, len(observed_subset))
         Di *= scale
         di *= scale
-        if self.noise_added:
-            si *= scale
 
         # Compute next covariance and mean
         S_next   = self.update_cov_param(dim, i, m, S, di, Di)
@@ -197,6 +197,10 @@ class SSVI_TF(object):
 
     @abstractmethod
     def estimate_di_Di_si(self, dim, i, coord, y, m, S):
+        raise NotImplementedError
+
+    @abstractmethod
+    def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         raise NotImplementedError
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
@@ -267,6 +271,8 @@ class SSVI_TF(object):
     def update_sigma_param(self, si_acc, scale):
         if not self.noise_added:
             return
+
+        si_acc *= scale
         w_grad = -1/(2 * np.square(self.w_tau)) + 1/ (4 * np.square(self.w_sigma)) * si_acc
         w_step = self.compute_stepsize_sigma_param(w_grad)
         update = (1-w_step) * (-1/np.square(self.w_sigma)) + w_step * w_grad

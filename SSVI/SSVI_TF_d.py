@@ -94,16 +94,7 @@ class SSVI_TF_d(SSVI_TF):
 
     def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch=None):
         num_samples = np.size(vjs_batch, axis=0)
-        # Shape = (num_samples, k1)
-        # print("vjs_batch: ", vjs_batch.shape)
-        # print("ys ", ys.shape)
-        # print("mean_batch ", mean_batch.shape)
-        # print("cov_batch ", cov_batch.shape)
-
         fst_deriv_batch, snd_deriv_batch = self.estimate_expected_derivative_batch(ys, mean_batch, cov_batch)
-
-        # print("fst ", fst_deriv_batch.shape)
-        # print("snd ", snd_deriv_batch.shape)
 
         di = np.zeros((self.D,))
         Di = np.zeros((self.D,self.D))
@@ -111,7 +102,6 @@ class SSVI_TF_d(SSVI_TF):
         for num in range(num_samples):
             # Compute vj * scale
             vjs_batch_scaled = np.transpose(np.multiply(np.transpose(vjs_batch[num, :, :]), fst_deriv_batch[num, :]))
-            # print("vjs_scaled ", vjs_batch_scaled.shape)
             di += np.average(vjs_batch_scaled, axis=0)
 
             for k1 in range(self.k1):
