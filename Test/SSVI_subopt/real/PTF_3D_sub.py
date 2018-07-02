@@ -6,7 +6,7 @@ from Tensor.Tensor import Tensor
 np.random.seed(seed=317) # For control and comparison
 # Generate synthesize data, true, this is what we try to recover
 
-dims     = [10, 10, 10]
+dims     = [100, 100, 10]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
@@ -28,4 +28,4 @@ factorizer = SSVI_TF_simple(data, rank=D, \
                                    mean_update=mean_update, cov_update=cov_update, \
                                    mean0=mean0, cov0=cov0)
 
-factorizer.factorize(report=100)
+factorizer.factorize(report=1)

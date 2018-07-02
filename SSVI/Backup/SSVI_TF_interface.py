@@ -16,8 +16,7 @@ import time
 
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                        mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=100, \
-                        eta=1, cov_eta=1, sigma_eta=1):
+                 mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=100):
 
         self.tensor = tensor
         self.dims   = tensor.dims
@@ -67,15 +66,16 @@ class SSVI_TF(object):
         self.offset = 0.000001
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
         self.ada_acc_cov = [np.zeros((self.D, self.D, s)) for s in self.dims]
-
-        self.eta = eta
-        self.cov_eta = cov_eta
+        self.eta = 1
         self.poisson_eta = 0.1
-        self.sigma_eta = sigma_eta
+        self.cov_eta = 1
 
+        self.cov_stepsize = 1
+        self.cov_stepsize_pois = 100
+
+        self.noise_added = False
         # keep track of changes in norm
         self.norm_changes = [np.ones((s, 2)) for s in self.dims]
-        self.noise_added  = False
 
     def factorize(self, report=1000):
         self.report = report
@@ -113,6 +113,41 @@ class SSVI_TF(object):
             iteration += 1
         return
 
+    def update_natural_params(self, dim, i, iteration):
+        observed_i = self.tensor.find_observed_ui(dim, i)
+        if len(observed_i) > self.batch_size:
+            observed_idx = np.random.choice(len(observed_i), self.batch_size, replace=False)
+            observed_i = np.take(observed_i, observed_idx, axis=0)
+
+        (m, S) = self.posterior.get_vector_distribution(dim, i)
+        di, Di, si = self.initialize_di_Di_si()
+
+        for entry in observed_i:
+            coord = entry[0]
+            y = entry[1]
+
+            (di_hat, Di_hat, si_hat) = self.estimate_di_Di_si(dim, i, coord, y, m, S)
+
+            Di += Di_hat
+            di += di_hat
+            si += si_hat
+
+        scale = len(observed_i) / min(self.batch_size, len(observed_i))
+        Di *= scale
+        di *= scale
+        si *= scale
+
+        # Compute next covariance and mean
+        S_next   = self.update_cov_param(dim, i, m, S, di, Di)
+        m_next   = self.update_mean_param(dim, i, m, S, di, Di)
+        self.update_sigma_param(si, scale)
+
+        # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
+        # Measures the change in the parameters from previous iterations
+        self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
+        # Update the change
+        self.posterior.update_vector_distribution(dim, i, m_next, S_next)
+
     def update_hyper_parameter(self, dim, iteration):
         """
         :param dim:
@@ -139,10 +174,7 @@ class SSVI_TF(object):
         coords = np.array([entry[0] for entry in observed_subset])
         ys = np.array([entry[1] for entry in observed_subset])
 
-        if self.likelihood_type == "normal":
-            di, Di, si = self.estimate_di_Di_si_complete_conditional_batch(dim, i, coords, ys, m, S)
-        else:
-            di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+        di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
         scale = len(observed) / min(self.batch_size, len(observed_subset))
         Di *= scale
@@ -153,12 +185,23 @@ class SSVI_TF(object):
         m_next   = self.update_mean_param(dim, i, m, S, di, Di)
         self.update_sigma_param(si, scale)
 
-        # print("cov_eta: ", self.cov_eta)
         # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
         # Measures the change in the parameters from previous iterations
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
+
+    @abstractmethod
+    def initialize_di_Di_si(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def estimate_di_Di_si(self, dim, i, coord, y, m, S):
+        raise NotImplementedError
+
+    @abstractmethod
+    def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
+        raise NotImplementedError
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
@@ -175,14 +218,13 @@ class SSVI_TF(object):
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
 
         assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+
+        ws_batch       = None # Shape will be (num_samples, k1)
         if self.noise_added:
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
-        else:
-            ws_batch   = None
 
         mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
         cov_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
-
         for num in range(num_subsamples):
             vs = vjs_batch[num, :, :] # shape (k1, D)
             cov_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
@@ -190,10 +232,6 @@ class SSVI_TF(object):
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, cov_batch, ws_batch)
 
         return di, Di, si
-
-    @abstractmethod
-    def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
-        raise NotImplementedError
 
     @abstractmethod
     def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
@@ -224,9 +262,7 @@ class SSVI_TF(object):
             S_next  = np.inner(L, np.transpose(L))
         elif self.cov_update == "N":
             covGrad = (self.pSigma_inv - 2 * Di_acc)
-            # print("covGrad.norm: ", np.linalg.norm(covGrad, "fro"))
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-            # print("covStep: ", covStep)
             S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
         else:
             raise Exception("Unidentified update formula for covariance param")
@@ -235,19 +271,12 @@ class SSVI_TF(object):
     def update_sigma_param(self, si_acc, scale):
         if not self.noise_added:
             return
-        # print("si: ", si_acc)
-        # print("scale: ", scale)
-        si_acc *= scale
-        w_grad = -1/(2 * np.square(self.w_tau)) + si_acc
-        # print("w_grad: ", w_grad)
-        w_step = self.compute_stepsize_sigma_param(w_grad)
-        # print("w_step ", w_step)
-        update = (1-w_step) * (-0.5/np.square(self.w_sigma)) + w_step * w_grad
-        # print("update: ", update)
-        next_sigma = np.sqrt(-0.5/update)
 
-        # print("sigma diff: ", next_sigma - self.w_sigma)
-        self.w_sigma = next_sigma
+        si_acc *= scale
+        w_grad = -1/(2 * np.square(self.w_tau)) + 1/ (4 * np.square(self.w_sigma)) * si_acc
+        w_step = self.compute_stepsize_sigma_param(w_grad)
+        update = (1-w_step) * (-1/np.square(self.w_sigma)) + w_step * w_grad
+        self.w_sigma = np.sqrt(-1/update)
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
         acc_grad = self.ada_acc_grad[dim][:, i]
@@ -262,14 +291,12 @@ class SSVI_TF(object):
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
         if self.likelihood_type == "poisson":
-            return self.cov_eta/(self.time_step[dim] + 1)
-
-        return self.cov_eta/(self.time_step[dim] + 1)
+            return self.cov_eta/(self.time_step[dim] + self.cov_stepsize_pois)
+        return self.cov_eta/(self.time_step[dim] + self.cov_stepsize)
 
     def compute_stepsize_sigma_param(self, w_grad):
         self.w_ada_grad += np.square(w_grad)
-
-        w_step = self.sigma_eta / self.w_ada_grad
+        w_step = self.eta / self.w_ada_grad
         return w_step
 
     def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
@@ -280,15 +307,15 @@ class SSVI_TF(object):
             cov_change  = np.linalg.norm(S_next - S)
         self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
 
-    def sample_vjs_batch(self, cols_batch, dims_batch, k):
-        num_subsamples = np.size(cols_batch, axis=0)
+    def sample_vjs_batch(self, othercols_concat, otherdims, k):
+        num_subsamples = np.size(othercols_concat, axis=0)
         vjs_batch = np.ones((num_subsamples, k, self.D))
 
         for num in range(num_subsamples):
-            cols = cols_batch[num, :]
+            othercols = othercols_concat[num, :]
 
-            for dim, col in enumerate(cols):
-                (mi, Si) = self.posterior.get_vector_distribution(dims_batch[dim], col)
+            for dim, col in enumerate(othercols):
+                (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
 
                 if Si.ndim == 1:
                     vj_sample = np.random.multivariate_normal(mi, np.diag(Si), size=k)
@@ -324,7 +351,7 @@ class SSVI_TF(object):
             print("Mean update scheme: ", self.mean_update)
             print("Covariance update : ", self.cov_update)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
-            print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
+            print("eta = ", self.eta, " cov eta = ", self.cov_eta)
             print("iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |", end=" ")
             if self.likelihood_type == "poisson":
                 print("test_nll | train_nll ")

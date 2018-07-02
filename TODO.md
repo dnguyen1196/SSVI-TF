@@ -2,17 +2,15 @@
 - The error is increasing, why?
   + Check the normal pdf + derivatives
   + More samples? - tried, no improvements yet
-  + N - N update causes error to decrease :|
+  + N - N update causes error to decrease :|\
   
-- Do safe division with log
-- The error decreases and then increases? -> constant is not 'optimal?'
-- Change how I do sampling? -> 1 giant sampling?
+- d_cov -> it's always the same?
+- w_sigma changes a lot -> increasingly (did I forget to take average?)
+It seems like the problem comes from si update that gets increasingly bigger
+  
+
 
 # Implement a common interface
-- Implement a common estimate_di_Di_si function
-- Switch to batch processing including sampling 
-- Then we need to update the probability classes
-- This might be faster
 
 # Have another implementation for suboptimal bound
 
@@ -30,6 +28,8 @@
 
 # Questions: 
 - Is it better to do approximation or sampling
+
+
 
 
 

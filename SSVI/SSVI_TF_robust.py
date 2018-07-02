@@ -6,10 +6,11 @@ from numpy.linalg import inv
 
 class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                 mean0=None, cov0=None, sigma0=1,k1=50, k2=50, batch_size=100, eta=0.05, cov_eta=.000001):
+                 mean0=None, cov0=None, sigma0=1,k1=50, k2=50, batch_size=100, eta=0.01, cov_eta=.0001, sigma_eta=0.001):
+
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
-                 mean0, cov0, sigma0,k1, k2, batch_size)
+                 mean0, cov0, sigma0,k1, k2, batch_size, eta, cov_eta, sigma_eta)
 
         self.pmu             = np.ones((self.D,))
         self.pSigma          = np.ones((len(self.dims),))
@@ -20,76 +21,112 @@ class SSVI_TF_robust(SSVI_TF):
         self.w_sigma = 1.
         self.w_ada_grad = 0.
 
-        # Override the eta constant in adagrad
-        self.eta = eta
-        self.cov_eta = cov_eta
         self.noise_added = True
 
-    def initialize_di_Di_si(self):
-        Di = np.zeros((self.D, self.D))
-        di = np.zeros((self.D,))
-        si = 0.
-        return di, Di, si
+    def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
+        num_subsamples     = np.size(coords, axis=0) # Number of subsamples
 
-    def estimate_di_Di_si(self, dim, i, coord, y, m, S):
-        """
-        :param dim:
-        :param i:
-        :param coord:
-        :param y:
-        :return:
+        othercols_left     = coords[:, : dim]
+        othercols_right    = coords[:, dim + 1 :]
+        othercols_concat   = np.concatenate((othercols_left, othercols_right), axis=1)
 
-        Estimate the di and Di (see paper for details) based
-        on the given coordinate point, its value y, current
-        mean and covariance m, S
-        """
-        othercols    = coord[: dim]
-        othercols.extend(coord[dim + 1 :])
-
-        alldims       = list(range(self.order))
-        otherdims     = alldims[:dim]
+        alldims            = list(range(self.order))
+        otherdims          = alldims[:dim]
         otherdims.extend(alldims[dim + 1 : ])
 
-        di          = np.zeros((self.D, ))
-        Di          = np.zeros((self.D, self.D))
-        si          = 0.
+        # Shape of vjs_batch would be (num_subsamples, k1, D)
+        # Note that the formulation for fully robust model requires sampling for all
+        # component vectors
+        vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
 
-        vjs_batch = self.sample_vjs_batch(othercols, otherdims, self.k1)
+        # uis_batch.shape = (num_samples, k1, D)
+        uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
 
-        for k1 in range(self.k1):
-            vjs = vjs_batch[k1, :]
-            w   = np.random.rayleigh(np.square(self.w_sigma))
+        assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
 
-            meanf     = np.dot(vjs, m)
-            covS      = w
-            pdf, pdf_1st, pdf_2nd = self.approximate_expected_derivative_pdf(y, meanf, covS)
+        ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
 
-            inv_phi = np.divide(1, pdf)
-            vj_phi_prime = np.multiply(vjs, pdf_1st)
+        # mean_batch.shape = (num_samples, k1)
+        mean_batch = np.sum(np.multiply(vjs_batch, uis_batch), axis=2)
 
-            di += inv_phi * vj_phi_prime
+        di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(ys, mean_batch, vjs_batch, ws_batch)
 
-            Di += inv_phi * (np.outer(vjs, vjs) * pdf_2nd \
-                  - inv_phi * np.outer(vj_phi_prime, vj_phi_prime))
+        return di, Di, si
 
-            si += np.divide(w, (8 * np.square(self.w_sigma))) * pdf_2nd * inv_phi
+    def approximate_di_Di_si_with_second_layer_samplings(self, ys, mean_batch, vjs_batch, ws_batch):
+        """
 
-        return di/self.k1, 0.5 * Di/self.k1, si/self.k1
+        :param ys:          (num_samples,)
+        :param mean_batch:  (num_samples, k1)
+        :param vjs_batch:   (num_samples, k1, D)
+        :param ws_batch:    (num_samples, k1)
+        :return:
+        """
+        num_samples     = np.size(mean_batch, axis=0)
+        assert(self.k1 == np.size(mean_batch, axis=1))
 
-    def approximate_expected_derivative_pdf(self, y, meanf, varf):
-        fs = np.random.normal(meanf, varf, (self.k2,))
-        pdf = 0.
-        pdf_prime = 0.
-        pdf_double_prime = 0.
+        # All shapes are (num_samples, k1)
+        phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
+
+        di = np.zeros((num_samples, self.D))
+        Di = np.zeros((num_samples, self.D, self.D))
+        si = np.zeros((num_samples,))
+
+        for num in range(num_samples):
+            # p.shape = (k1,)
+            p = phi[num, :]
+            p1 = phi_fst[num, :]
+            p2 = phi_snd[num, :]
+            v  = vjs_batch[num, :, :]
+            w  = ws_batch[num, :]
+
+            di[num, :] = np.average(np.transpose(np.multiply(np.transpose(v), \
+                                                             1/p * p1)), axis=0)
+
+            si[num]    = np.average(np.multiply(w, np.divide(p2, p))) / (8*np.square(self.w_sigma))
+
+            for k in range(self.k1):
+                Di[num, :, :] += 0.5 / self.k1 /p[k] * \
+                                 (np.outer(v[k, :], v[k, :]) * p2[k] \
+                                  - 1/p[k] * np.outer(v[k]*p2[k], v[k]*p2[k]))
+
+        di = np.average(di, axis=0)
+        Di = np.average(Di, axis=0)
+        si = np.average(si)
+
+        # print("di.shape ", di.shape)
+        # print("Di.shape ", Di.shape)
+        # print("si.shape ", si.shape)
+        return di, Di, si
+
+    def estimate_expected_derivatives_pdf_batch(self, ys, mean_batch, ws_batch):
+        """
+        :param ys:          (num_samples)
+        :param mean_batch:  (num_samples, k1)
+        :param ws_batch:    (num_samples, k1)
+        :return:
+        """
+        # print("mean_batch: ", mean_batch.shape)
+        # print("ys: ", ys.shape)
+
         s = self.likelihood_param
-        for f in fs:
-            pdf += self.likelihood.pdf(y, f, s)
-            pdf_prime += self.likelihood.fst_derivative_pdf(y, f, s)
-            pdf_double_prime += self.likelihood.snd_derivative_pdf(y, f, s)
-        return pdf/self.k2, pdf_prime/self.k2, pdf_double_prime/self.k2
+        num_samples = np.size(ys, axis=0)
+        pdf         = np.zeros((num_samples, self.k1))
+        fst_deriv   = np.zeros_like(pdf)
+        snd_deriv   = np.zeros_like(pdf)
 
-    # def compute_stepsize_cov_param(self, dim, i, covGrad):
-    #     if self.likelihood_type == "poisson":
-    #         return 1/(self.time_step[dim] + self.cov_stepsize_pois)
-    #     return 0.001/(self.time_step[dim] + self.cov_stepsize)
+        # print("ws_batch.norm ", np.linalg.norm(ws_batch))
+
+        for num in range(num_samples):
+            fs = np.random.normal(mean_batch[num, :], ws_batch[num, :], size=(self.k2,self.k1))
+            # print("fs ", fs.shape)
+            pdf[num, :]       = np.average(self.likelihood.pdf(ys[num], fs, s), axis=0)
+            fst_deriv[num, :] = np.average(self.likelihood.fst_derivative_pdf(ys[num], fs, s), axis=0)
+            snd_deriv[num, :] = np.average(self.likelihood.snd_derivative_pdf(ys[num], fs, s), axis=0)
+
+        return pdf, fst_deriv, snd_deriv
+
+    # TODO: implement closed form version
+    def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
+        return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 

@@ -19,70 +19,65 @@ class SSVI_TF_simple(SSVI_TF):
         self.w_sigma = 1.
         self.w_ada_grad = 0.
 
-    def initialize_di_Di_si(self):
-        Di = np.zeros((self.D, self.D))
+        self.noise_added = True
+
+    def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
+        return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+
+    def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
+        """
+        :param vjs_batch:  (num_sample, k1, D)
+        :param ys:         (num_sample,)
+        :param mean_batch: (num_sample, k1)
+        :param cov_batch:  (num_sample, k1)
+        :param ws_batch:   (num_sample, k1)
+        :return:
+        """
+        num_samples = np.size(vjs_batch, axis=0)
+        fst_deriv_batch, snd_deriv_batch, si = \
+            self.estimate_expected_derivative_batch(ys, mean_batch, cov_batch, ws_batch)
+
+        # print("si = ", si)
+
         di = np.zeros((self.D,))
-        si = 0.
-        return di, Di, si
+        Di = np.zeros((self.D,self.D))
 
-    def estimate_di_Di_si(self, dim, i, coord, y, m, S):
-        # if self.likelihood_type == "normal":
-        #     return self.compute_di_Di_si_complete_conditional(dim, i, coord, y, m, S)
-        return self.estimate_di_Di_si_by_sampling(dim, i, coord, y, m, S)
+        for num in range(num_samples):
+            # Compute vj * scale
+            vjs_batch_scaled = np.transpose(np.multiply(np.transpose(vjs_batch[num, :, :]), \
+                                                        fst_deriv_batch[num, :]))
+            di += np.average(vjs_batch_scaled, axis=0)
 
-    def estimate_di_Di_si_by_sampling(self, dim, i, coord, y, m, S):
-        othercols    = coord[: dim]
-        othercols.extend(coord[dim + 1 :])
-
-        alldims       = list(range(self.order))
-        otherdims     = alldims[:dim]
-        otherdims.extend(alldims[dim + 1 : ])
-
-        di          = np.zeros((self.D, ))
-        Di          = np.zeros((self.D, self.D))
-
-        for k1 in range(self.k1):
-            vjs     = self.sample_vjs(othercols, otherdims)
-            w       = np.random.rayleigh(self.w_sigma)
-            meanf   = np.dot(vjs, m)
-            covS    = np.dot(vjs, np.inner(S, vjs)) + w
-
-            fst_deriv, snd_deriv = \
-                self.estimate_expected_log_derivative(y, meanf, covS)
-
-            di += vjs * fst_deriv/self.k1                   # Update di
-            Di += np.outer(vjs, vjs) * snd_deriv/(2*self.k1) # Update Di
-
-        si = self.estimate_si(othercols, otherdims, m, S, y)
+            for k1 in range(self.k1):
+                vj = vjs_batch[num, k1, :]
+                Di += 1/2 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
 
         return di, Di, si
 
-    def estimate_expected_log_derivative(self, y, meanf, covS) :
-        first_derivative = 0.0
-        snd_derivative = 0.0
-        s = self.likelihood_param
+    def estimate_expected_derivative_batch(self, ys, mean_batch, cov_batch, ws_batch):
+        num_samples     = np.size(mean_batch, axis=0)
 
-        for k2 in range(self.k2):
-            f = np.random.normal(meanf, covS)
-            snd_derivative += self.likelihood.snd_derivative_log_pdf(y, f, s)
-            first_derivative += self.likelihood.fst_derivative_log_pdf(y, f, s)
+        assert(self.k1 == np.size(mean_batch, axis=1))
 
-        return first_derivative/self.k2, snd_derivative/self.k2
+        fst_deriv_batch = np.zeros((num_samples,self.k1))
+        snd_deriv_batch = np.zeros((num_samples,self.k1))
+        si_batch        = np.zeros((num_samples,self.k1))
 
-    def estimate_si(self, othercols, otherdims, m, S, y):
-        si = 0.
-        for k1 in range(self.k1):
-            ui  = np.random.multivariate_normal(m, S)
-            uis = self.sample_vjs(othercols, otherdims)
-            w   = np.random.rayleigh(self.w_sigma)
+        s  = self.likelihood_param
 
-            meanf = np.sum(np.multiply(ui, uis))
-            covf  = w
-            _, snd_deriv = self.estimate_expected_log_derivative(y, meanf, covf)
+        for num in range(num_samples):
+            fs = np.random.normal(mean_batch[num, :], cov_batch[num, :] + ws_batch[num, :], size=(self.k2, self.k1))
 
-            si += w/(8 * np.square(self.w_sigma)) * snd_deriv
-        return si / self.k1
+            fst_deriv_batch[num, :] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s), axis=0)
+            # print("fst " , fst_deriv_batch.shape)
 
+            snd_deriv_batch[num, :] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
+            si_batch[num, :] = np.multiply(snd_deriv_batch[num, :], ws_batch[num, :]) / (8 * np.square(self.w_sigma))
+
+        si = si_batch.mean()
+        return fst_deriv_batch, snd_deriv_batch, si
+
+    # TODO: implement batch version by doing something similar to this
     def compute_di_Di_si_complete_conditional(self, dim, i, coord, y, mui, Sui):
         othercols    = coord[: dim]
         othercols.extend(coord[dim + 1 :])
