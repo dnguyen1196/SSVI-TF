@@ -1,0 +1,163 @@
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.03196072578430176
+sigma diff:  1.69549103664e-05
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  8.41625236148e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  3.68383945215e-06
+mean :  0.0316227766017  cov:  4.472135955
+Tensor dimensions:  [10, 10, 10]
+Optimization metrics:
+Mean update scheme:  S
+Covariance update :  N
+k1 samples =  50  k2 samples =  10
+eta =  0.01  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+    1         0.72      0.3501     0.3427      1.0       4.4721
+sigma diff:  5.1920676456e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  3.24325482426e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  6.71913359618e-07
+mean :  0.0316227766017  cov:  4.472135955
+    2         1.49      0.3507     0.3432      1.0       4.4721
+sigma diff:  1.41689194444e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  1.86329631191e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  5.6210466659e-07
+mean :  0.0316227766017  cov:  4.472135955
+    3         2.25      0.3512     0.3437      1.0       4.4721
+sigma diff:  1.40331524889e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  1.28624627815e-06
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  6.98193836302e-07
+mean :  0.0316227766017  cov:  4.472135955
+    4         3.07      0.3518     0.3442      1.0       4.4721
+sigma diff:  7.26283842845e-07
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  9.98597683211e-07
+mean :  0.0316227766017  cov:  4.472135955
+sigma diff:  1.51481060007e-06
+mean :  0.0316227766017  cov:  4.472135955
+    5         3.88      0.3523     0.3447      1.0       4.4721
+
+
+    /home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.03093552589416504
+Tensor dimensions:  [10, 10, 10]
+Optimization metrics:
+Mean update scheme:  N
+Covariance update :  N
+k1 samples =  50  k2 samples =  10
+eta =  0.001  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+    50       43.08      0.3458     0.3308     3.4369     0.0918
+   100        86.9      0.3443     0.3268     3.6257     0.0227
+   150       130.39     0.344      0.326      2.6498     0.0148
+   200       173.64     0.3411     0.3184     1.7111     0.0244
+   250       217.01     0.3396     0.3142     1.9124     0.0186
+   300       260.28     0.3417     0.3199     1.2473     0.0122
+   350       303.41     0.3417     0.3198     1.2559     0.0191
+   400       346.49     0.3438     0.3254     1.2304     0.0142
+   450       389.28     0.3432     0.324      2.3901     0.0129
+   500       431.99     0.3431     0.3237     1.4621     0.0187
+   550       474.66     0.3492      0.34      1.6918     0.0208
+   600       517.26     0.3476     0.3356     2.3512     0.0158
+   650       559.81     0.3483     0.3375     1.7394     0.0129
+   700       602.19     0.3482     0.3372     2.336      0.0122
+
+
+
+   /home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_d/real/PTF_3D.py
+Generating synthetic data ...
+Generating synthetic data took:  0.03077244758605957
+Tensor dimensions:  [20, 20, 20]
+Optimization metrics:
+Mean update scheme:  S
+Covariance update :  N
+k1 samples =  30  k2 samples =  10
+eta =  1  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+   100       24.04      0.0465     0.0472     2.5775     0.0595
+   200       49.08      0.0443     0.0414     1.2008     0.0187
+   300       74.01      0.0434     0.0403     0.5251     0.0092
+   400       98.92      0.044       0.04      0.2339     0.0059
+   500       123.84     0.0435     0.0401     0.1319     0.0042
+
+
+  /home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.03109431266784668
+Tensor dimensions:  [10, 10, 10]
+Optimization metrics:
+Mean update scheme:  N
+Covariance update :  N
+k1 samples =  50  k2 samples =  10
+eta =  1e-05  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+   100       86.22      0.3436     0.3259     3.1963     0.0275
+   200       172.52     0.3439     0.3267     3.4633     0.0287
+   300       257.65     0.3366     0.3073     2.4337     0.0196
+   400       342.46     0.3416     0.3205     1.8438     0.0193
+   500       426.91     0.3403     0.3172     1.7083     0.0278
+   600       511.38     0.3416     0.3207     1.5068      0.02
+   700       595.8      0.3384     0.3121      1.72       0.02
+   800       680.08     0.3434     0.3254     2.7696     0.014
+   900       764.18     0.3455     0.331      1.8672     0.0162
+   1000      848.26     0.3462     0.333      1.6741     0.0172
+   1100      932.09     0.3455     0.331      2.0016     0.0163
+   1200     1015.46     0.3556     0.358      1.1822     0.0269
+   1300     1098.35     0.3584     0.3653     2.0543     0.0146
+   1400     1181.03     0.3676     0.3899     5.7356     0.028
+   1500     1263.99     0.3611     0.3725     8.3818     0.0252
+   1600     1346.86     0.3612     0.373      6.2831     0.0302
+   1700     1430.31     0.3909     0.452     40.2044     0.0521
+   1800     1514.12     0.3657     0.385     11.3534     0.0134
+   1900     1598.07     0.4164     0.5201    10.9881     0.0463
+Traceback (most recent call last):
+
+
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.03129744529724121
+Tensor dimensions:  [10, 10, 10]
+Optimization metrics:
+Mean update scheme:  S
+Covariance update :  N
+k1 samples =  20  k2 samples =  10
+eta =  0.01  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+   100       61.12      0.385      0.3765     0.0147     0.0006
+   200       122.82     0.4069     0.3979     0.0112     0.0001
+   300       184.72     0.4247     0.4153     0.0095      0.0
+   400       246.28     0.4402     0.4305     0.0084      0.0
+   500       308.1      0.4541     0.4443     0.0077      0.0
+   600       369.83     0.4671     0.4571     0.0071      0.0
+   700       431.49     0.4791     0.4691     0.0067      0.0
+   800       494.05     0.4906     0.4805     0.0063      0.0
+
+
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.031284332275390625
+Tensor dimensions:  [10, 10, 10]
+Optimization metrics:
+Mean update scheme:  S
+Covariance update :  S
+k1 samples =  100  k2 samples =  10
+eta =  0.01  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+   100       111.15     0.385      0.3765     0.0147       0
+   200       222.44     0.4069     0.3979     0.0111       0
+   300       333.57     0.4247     0.4153     0.0094       0
+   400       444.81     0.4401     0.4305     0.0084       0
+   500       556.05     0.4541     0.4443     0.0077       0
+   600       667.08     0.467      0.4571     0.007        0
+   700       778.07     0.4791     0.469      0.0066       0
+   800       889.18     0.4905     0.4804     0.0063       0
+   900       1000.4     0.5014     0.4912     0.006        0
+Traceback (most recent call last):

@@ -15,7 +15,7 @@ class NormalDistribution(object):
         return np.maximum(res, self.epsilon)
 
     def fst_derivative_pdf(self, y, m, s):
-        return -self.pdf(y, m, s) * (y - m) / s
+        return -np.multiply(self.pdf(y, m, s), (y - m) / s)
 
     def snd_derivative_pdf(self, y, m, s):
         return np.multiply(self.pdf(y, m, s), (np.square((y-m)/s) - 1/s))

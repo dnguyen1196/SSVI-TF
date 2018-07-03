@@ -16,7 +16,7 @@ import time
 
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                        mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=100, \
+                        mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=128, \
                         eta=1, cov_eta=1, sigma_eta=1):
 
         self.tensor = tensor
@@ -63,10 +63,10 @@ class SSVI_TF(object):
         self.time_step = [0 for _ in range(self.order)]
         self.epsilon = 0.0001
 
-        # Adagrad parameters
-        self.offset = 0.000001
+        # Optimization parameter
+        # self.scheme = scheme
+        # if scheme == "adagrad":
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
-        self.ada_acc_cov = [np.zeros((self.D, self.D, s)) for s in self.dims]
 
         self.eta = eta
         self.cov_eta = cov_eta
@@ -74,7 +74,7 @@ class SSVI_TF(object):
         self.sigma_eta = sigma_eta
 
         # keep track of changes in norm
-        self.norm_changes = [np.ones((s, 2)) for s in self.dims]
+        self.norm_changes = [np.zeros((s, 2)) for s in self.dims]
         self.noise_added  = False
 
     def factorize(self, report=1000):
@@ -84,14 +84,7 @@ class SSVI_TF(object):
         iteration = 0
 
         while True:
-            mean_change, cov_change = self.check_stop_cond()
-
             current = time.time()
-            if iteration != 0 and iteration % self.report == 0:
-                self.report_metrics(iteration, start, mean_change, cov_change)
-
-            if max(mean_change, cov_change) < self.epsilon:
-                break
 
             for dim in range(self.order):
                 col = update_column_pointer[dim]
@@ -109,6 +102,14 @@ class SSVI_TF(object):
                     self.time_step[dim] += 1  # increase time step
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.dims[dim]
+
+
+            mean_change, cov_change = self.check_stop_cond()
+            if iteration != 0 and iteration % self.report == 0:
+                self.report_metrics(iteration, start, mean_change, cov_change)
+
+            if max(mean_change, cov_change) < self.epsilon:
+                break
 
             iteration += 1
         return
@@ -144,16 +145,17 @@ class SSVI_TF(object):
         else:
             di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
-        scale = len(observed) / min(self.batch_size, len(observed_subset))
+        scale = len(observed) / len(observed_subset)
         Di *= scale
         di *= scale
 
         # Compute next covariance and mean
         S_next   = self.update_cov_param(dim, i, m, S, di, Di)
         m_next   = self.update_mean_param(dim, i, m, S, di, Di)
-        self.update_sigma_param(si, scale)
 
-        # print("cov_eta: ", self.cov_eta)
+        if self.noise_added:
+            self.w_sigma = self.update_sigma_param(si, scale)
+
         # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
         # Measures the change in the parameters from previous iterations
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
@@ -233,8 +235,6 @@ class SSVI_TF(object):
         return S_next
 
     def update_sigma_param(self, si_acc, scale):
-        if not self.noise_added:
-            return
         # print("si: ", si_acc)
         # print("scale: ", scale)
         si_acc *= scale
@@ -247,9 +247,12 @@ class SSVI_TF(object):
         next_sigma = np.sqrt(-0.5/update)
 
         # print("sigma diff: ", next_sigma - self.w_sigma)
-        self.w_sigma = next_sigma
+        return next_sigma
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
+        # if self.scheme == "sgd":
+        #     return self.eta/ (self.time_step[dim] + 1)
+
         acc_grad = self.ada_acc_grad[dim][:, i]
         grad_sqr = np.square(mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
@@ -290,7 +293,7 @@ class SSVI_TF(object):
             for dim, col in enumerate(cols):
                 (mi, Si) = self.posterior.get_vector_distribution(dims_batch[dim], col)
 
-                if Si.ndim == 1:
+                if Si.ndim == 1: #diagonal covariance
                     vj_sample = np.random.multivariate_normal(mi, np.diag(Si), size=k)
                 else:
                     vj_sample = np.random.multivariate_normal(mi, Si, size=k)

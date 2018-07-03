@@ -3,14 +3,14 @@ import numpy as np
 from SSVI.SSVI_TF_robust import SSVI_TF_robust
 from Tensor.Tensor import Tensor
 
-np.random.seed(seed=314)
+np.random.seed(seed=317)
 # For control and comparison
 # Generate synthesize data, true, this is what we try to recover
 
-dims     = [50, 50, 50]
+dims     = [50, 50]
 hidden_D = 20
-means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
-covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
+means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10]
+covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3]
 data = Tensor()
 data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
 
@@ -27,6 +27,7 @@ cov_update  = "N"
 
 factorizer  = SSVI_TF_robust(data, rank=D, \
                             mean_update=mean_update, cov_update=cov_update, \
-                            mean0=mean0, cov0=cov0, k1=128, k2=64, eta=0.1, cov_eta=0.0001, sigma_eta=1)
+                            mean0=mean0, cov0=cov0,\
+                            k1=128, k2=64, eta=3.5, cov_eta=1, sigma_eta=1)
 
-factorizer.factorize(report=5)
+factorizer.factorize(report=50)

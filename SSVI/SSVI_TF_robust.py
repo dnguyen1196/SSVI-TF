@@ -6,11 +6,13 @@ from numpy.linalg import inv
 
 class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                 mean0=None, cov0=None, sigma0=1,k1=50, k2=50, batch_size=100, eta=0.01, cov_eta=.0001, sigma_eta=0.001):
+                 mean0=None, cov0=None,\
+                 sigma0=1,k1=50, k2=50, batch_size=128, eta=0.01, cov_eta=.0001, sigma_eta=0.001):
 
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
-                 mean0, cov0, sigma0,k1, k2, batch_size, eta, cov_eta, sigma_eta)
+                 mean0, cov0, \
+                 sigma0,k1, k2, batch_size, eta, cov_eta, sigma_eta)
 
         self.pmu             = np.ones((self.D,))
         self.pSigma          = np.ones((len(self.dims),))
@@ -22,6 +24,12 @@ class SSVI_TF_robust(SSVI_TF):
         self.w_ada_grad = 0.
 
         self.noise_added = True
+
+        # Use ada delta instead of adagrad
+        del(self.ada_acc_grad)
+        self.delta_window = 10
+        self.ada_delta_grad = [np.zeros((s, self.D, )) for s in self.dims]
+
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
@@ -37,11 +45,16 @@ class SSVI_TF_robust(SSVI_TF):
         # Shape of vjs_batch would be (num_subsamples, k1, D)
         # Note that the formulation for fully robust model requires sampling for all
         # component vectors
+
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
+        # print("vjs ", vjs_batch.shape)
 
         # uis_batch.shape = (num_samples, k1, D)
         uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
+        # TODO: check if this is correct
+        # print(uis_batch.shape)
 
+        assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
         assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
 
         ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
@@ -77,8 +90,9 @@ class SSVI_TF_robust(SSVI_TF):
             p = phi[num, :]
             p1 = phi_fst[num, :]
             p2 = phi_snd[num, :]
-            v  = vjs_batch[num, :, :]
-            w  = ws_batch[num, :]
+
+            v  = vjs_batch[num, :, :] # v.shape = (k1, D)
+            w  = ws_batch[num, :]     # w.shape = (k1,)
 
             di[num, :] = np.average(np.transpose(np.multiply(np.transpose(v), \
                                                              1/p * p1)), axis=0)
@@ -90,9 +104,9 @@ class SSVI_TF_robust(SSVI_TF):
                                  (np.outer(v[k, :], v[k, :]) * p2[k] \
                                   - 1/p[k] * np.outer(v[k]*p2[k], v[k]*p2[k]))
 
-        di = np.average(di, axis=0)
-        Di = np.average(Di, axis=0)
-        si = np.average(si)
+        di = np.sum(di, axis=0)
+        Di = np.sum(Di, axis=0)
+        si = np.sum(si)
 
         # print("di.shape ", di.shape)
         # print("Di.shape ", Di.shape)
@@ -110,6 +124,7 @@ class SSVI_TF_robust(SSVI_TF):
         # print("ys: ", ys.shape)
 
         s = self.likelihood_param
+
         num_samples = np.size(ys, axis=0)
         pdf         = np.zeros((num_samples, self.k1))
         fst_deriv   = np.zeros_like(pdf)
@@ -118,11 +133,16 @@ class SSVI_TF_robust(SSVI_TF):
         # print("ws_batch.norm ", np.linalg.norm(ws_batch))
 
         for num in range(num_samples):
-            fs = np.random.normal(mean_batch[num, :], ws_batch[num, :], size=(self.k2,self.k1))
-            # print("fs ", fs.shape)
+            # For each num_samples, fs.shape = (k2, k1)
+            fs = np.random.normal(mean_batch[num], ws_batch[num], size=(self.k2, self.k1))
+
             pdf[num, :]       = np.average(self.likelihood.pdf(ys[num], fs, s), axis=0)
             fst_deriv[num, :] = np.average(self.likelihood.fst_derivative_pdf(ys[num], fs, s), axis=0)
             snd_deriv[num, :] = np.average(self.likelihood.snd_derivative_pdf(ys[num], fs, s), axis=0)
+
+        # assert (pdf.shape == (num_samples, self.k1))
+        # assert (fst_deriv.shape == (num_samples, self.k1))
+        # assert (snd_deriv.shape == (num_samples, self.k1))
 
         return pdf, fst_deriv, snd_deriv
 
