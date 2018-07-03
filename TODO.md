@@ -21,6 +21,16 @@
 regardless of the cov_eta?
 - and why does the error increases regardless of the sign of di?
 
+
+- It seems that when using ada delta N-S update seems to be better 
+(but with prelim 10-size window, error goes down and then goes up T.T)
+This corresponds with a sharp increase in d_mean -> may be change from
+looking at max(d_mean) to average d_mean?
+
+- Also why does d_cov 0? 
+
+
+
 TODO:
 - Check the formulation once again -> make sure it's 100% correct
 - Also look at the update formula + the generic update formula too :|

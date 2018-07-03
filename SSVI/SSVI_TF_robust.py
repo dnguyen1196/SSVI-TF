@@ -7,7 +7,8 @@ from numpy.linalg import inv
 class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                  mean0=None, cov0=None,\
-                 sigma0=1,k1=50, k2=50, batch_size=128, eta=0.01, cov_eta=.0001, sigma_eta=0.001):
+                 sigma0=1,k1=50, k2=50, batch_size=128, \
+                 window_size=5, eta=1, cov_eta=1, sigma_eta=1):
 
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
@@ -27,9 +28,9 @@ class SSVI_TF_robust(SSVI_TF):
 
         # Use ada delta instead of adagrad
         del(self.ada_acc_grad)
-        self.delta_window = 10
-        self.ada_delta_grad = [np.zeros((s, self.D, )) for s in self.dims]
-
+        self.window_size = window_size
+        self.ada_delta_grad = [np.zeros((s, self.D, self.window_size)) for s in self.dims]
+        self.ada_delta_ptr  = [np.zeros((s,), dtype=int) for s in self.dims]
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
@@ -150,3 +151,17 @@ class SSVI_TF_robust(SSVI_TF):
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
+    def compute_stepsize_mean_param(self, dim, i, mGrad):
+        delta_grads = self.ada_delta_grad[dim][i, :, :]
+
+        cur         = self.ada_delta_ptr[dim][i]
+        ptr         = cur % self.window_size
+        delta_grads[:, ptr] = np.square(mGrad)
+
+        if cur + 1 >= self.window_size:
+            step_size = self.eta/ np.sqrt(np.sum(delta_grads, axis=1))
+        else:
+            step_size = self.eta / np.sqrt(np.sum(delta_grads[:, : cur + 1], axis=1))
+        # print("step size: ", step_size )
+        self.ada_delta_ptr[dim][i] = cur + 1
+        return step_size

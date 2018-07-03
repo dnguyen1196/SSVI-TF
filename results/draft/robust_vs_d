@@ -113,3 +113,85 @@ iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
    1250      196.54     0.0089     0.0082     0.0055     0.0044
    1300      204.53     0.0089     0.0082     0.0044     0.0042
    1350      212.13     0.0089     0.0082     0.0034     0.004
+
+
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_2D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.0763864517211914
+Tensor dimensions:  [50, 50]
+Optimization metrics:
+Mean update scheme:  N
+Covariance update :  N
+k1 samples =  128  k2 samples =  64
+eta =  1  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+    50       31.05      0.2784     0.2757     4.4721     4.4721
+   100       62.35      0.2778     0.2752     1.9325     0.3203
+   150       93.47      0.2779     0.2753     1.2374     0.0874
+   200       124.61     0.2776     0.2751     1.1792     0.0687
+   250       155.82     0.2777     0.2751     1.118      0.0699
+   300       186.96     0.2776     0.275      0.7421     0.0878
+   350       218.25     0.2776     0.275      0.6875     0.0913
+   400       250.16     0.2776     0.275      0.6281     0.0874
+   450       282.26     0.2776     0.275      0.534      0.0823
+
+
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_2D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.07362842559814453
+Tensor dimensions:  [50, 50]
+Optimization metrics:
+Using Ada Delta with window size =  10
+Mean update scheme:  N
+Covariance update :  S
+k1 samples =  128  k2 samples =  64
+eta =  1  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+    50       29.71      0.2775     0.2748     4.4721       0
+   100       58.86      0.2257     0.2233     1.4327       0
+   150       87.93      0.1967     0.1944     0.8191       0
+   200       117.1      0.1772     0.1749     0.5427       0
+   250       146.23     0.1626     0.1605     0.3918       0
+   300       175.39     0.1512     0.1491     0.3144       0
+   350       204.53     0.1419     0.1399     0.2494       0
+   400       233.83     0.1342     0.1322     0.2123       0
+   450       263.24     0.1275     0.1256     0.1816       0
+   500       292.65     0.1214     0.1195     0.3279       0
+   550       322.04     0.1036     0.1018     0.3605       0
+   600       351.61     0.0851     0.0832     0.3883       0
+   650       381.28     0.0696     0.068      0.3428       0
+   700       411.29     0.0574     0.0564     0.4707       0
+   750       441.12     0.0488     0.0484     1.0911       0
+   800       471.22     0.0449     0.0456     3.4683       0
+   850       501.17     0.0961     0.1008     4.4662       0
+   900       530.65     0.3405     0.3517     4.4718       0
+
+
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_2D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  0.07307028770446777
+Tensor dimensions:  [50, 50]
+Optimization metrics:
+Using Ada Delta with window size =  5
+Mean update scheme:  N
+Covariance update :  S
+k1 samples =  128  k2 samples =  64
+eta =  1  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |
+    50       30.15      0.2775     0.2748     4.4721       0
+   100       59.87      0.2257     0.2233     1.4327       0
+   150       89.63      0.1967     0.1944     0.8191       0
+   200       120.45     0.1772     0.1749     0.5427       0
+   250       150.26     0.1619     0.1598     0.7656       0
+   300       180.16     0.1231     0.121      0.8001       0
+   350       210.29     0.0925     0.0906     0.6892       0
+   400       240.4      0.0707     0.0693     0.5456       0
+   450       270.71     0.0551     0.0545     0.8655       0
+   500       301.05     0.0458     0.0466     3.2389       0
+   550       331.92     0.1422     0.1493     4.4691       0
+   600       362.68     0.4495     0.4598     4.472        0
+   650       392.26     0.8101     0.8223     4.4719       0
+   700       421.95     1.2086     1.2228     4.4707       0
+   750       451.74     1.642      1.6582     4.4497       0
+   800       481.47     2.107      2.1253     4.4015       0
+   850       511.15     2.6007     2.6212     4.3303       0

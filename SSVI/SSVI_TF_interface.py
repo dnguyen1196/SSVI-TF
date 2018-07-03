@@ -324,6 +324,10 @@ class SSVI_TF(object):
         if iteration == self.report:
             print("Tensor dimensions: ", self.dims)
             print("Optimization metrics: ")
+            if self.window_size is not None:
+                print("Using Ada Delta with window size = ", self.window_size)
+            else:
+                print("Using Ada Grad")
             print("Mean update scheme: ", self.mean_update)
             print("Covariance update : ", self.cov_update)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
