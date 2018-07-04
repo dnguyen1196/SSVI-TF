@@ -77,6 +77,9 @@ class SSVI_TF(object):
         self.norm_changes = [np.zeros((s, 2)) for s in self.dims]
         self.noise_added  = False
 
+        self.d_mean = 1.
+        self.d_cov  = 1.
+
     def factorize(self, report=1000):
         self.report = report
         update_column_pointer = [0] * self.order
@@ -154,10 +157,14 @@ class SSVI_TF(object):
         m_next   = self.update_mean_param(dim, i, m, S, di, Di)
 
         if self.noise_added:
-            self.w_sigma = self.update_sigma_param(si, scale)
+            w_sigma        = self.update_sigma_param(si, scale)
+            self.w_changes = np.abs(w_sigma - self.w_sigma)
+            self.w_sigma   = w_sigma
 
-        # print("mean : ", np.linalg.norm(m_next - m), " cov: ", np.linalg.norm(S_next - S, "fro"))
         # Measures the change in the parameters from previous iterations
+        # print("di.norm = ", np.linalg.norm(di), "Di.norm ", np.linalg.norm(Di) \
+        #       , "dm = ", np.linalg.norm(m_next - m), "; dS = ", np.linalg.norm(S_next - S, "fro"))
+
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
@@ -220,33 +227,32 @@ class SSVI_TF(object):
         if self.cov_update == "S":
             L = cholesky(S)
             covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
-                      - np.inner(L, self.pSigma_inv) + 2 * np.inner(L, Di_acc))
-            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-            L_next  = L + covStep * covGrad
-            S_next  = np.inner(L, np.transpose(L))
-        elif self.cov_update == "N":
-            covGrad = (self.pSigma_inv - 2 * Di_acc)
-            # print("covGrad.norm: ", np.linalg.norm(covGrad, "fro"))
+                      - np.inner(L, self.pSigma_inv) + 2 * np.dot(L, Di_acc))
+
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
             # print("covStep: ", covStep)
+            # print(np.linalg.norm(covGrad))
+            # print(np.min(covGrad))
+            L_next  = L + covStep * covGrad
+            # print(np.linalg.norm(L_next - L, "fro"))
+            S_next  = np.dot(L, np.transpose(L))
+            # print(np.linalg.norm(S_next - S, 'fro'))
+
+        elif self.cov_update == "N":
+            covGrad = (self.pSigma_inv - 2 * Di_acc)
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
             S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+
         else:
             raise Exception("Unidentified update formula for covariance param")
         return S_next
 
     def update_sigma_param(self, si_acc, scale):
-        # print("si: ", si_acc)
-        # print("scale: ", scale)
         si_acc *= scale
         w_grad = -1/(2 * np.square(self.w_tau)) + si_acc
-        # print("w_grad: ", w_grad)
         w_step = self.compute_stepsize_sigma_param(w_grad)
-        # print("w_step ", w_step)
         update = (1-w_step) * (-0.5/np.square(self.w_sigma)) + w_step * w_grad
-        # print("update: ", update)
         next_sigma = np.sqrt(-0.5/update)
-
-        # print("sigma diff: ", next_sigma - self.w_sigma)
         return next_sigma
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
@@ -324,7 +330,7 @@ class SSVI_TF(object):
         if iteration == self.report:
             print("Tensor dimensions: ", self.dims)
             print("Optimization metrics: ")
-            if self.window_size is not None:
+            if hasattr(self, "window_size"):
                 print("Using Ada Delta with window size = ", self.window_size)
             else:
                 print("Using Ada Grad")
@@ -334,9 +340,13 @@ class SSVI_TF(object):
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
             print("iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |", end=" ")
             if self.likelihood_type == "poisson":
-                print("test_nll | train_nll ")
+                print("test_nll | train_nll ", end=" ")
+
+            if self.noise_added:
+                print("   dw   ")
             else:
                 print("")
+
         current = time.time()
         dec = 4
 
@@ -352,9 +362,13 @@ class SSVI_TF(object):
                   .format(np.around(\
                             self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), dec), \
                           np.around(\
-                            self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec)))
+                            self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec)), end=" ")
+
+        if self.noise_added:
+            print('{:^10}'.format(np.around(self.w_changes, dec)))
         else:
             print("")
+
 
     def estimate_vlb(self, entries, values):
         vlb = 0.0
@@ -384,15 +398,19 @@ class SSVI_TF(object):
         :return: boolean
         Check for stopping condition
         """
-        max_mean_change = 0
-        max_cov_change  = 0
+        d_mean = 0
+        d_cov  = 0
+
         for dim in range(len(self.dims)):
             for col in range(self.dims[dim]):
                 mean_change, cov_change = self.norm_changes[dim][col, :]
-                max_mean_change = max(max_mean_change, mean_change)
-                max_cov_change  = max(max_cov_change, cov_change)
+                d_mean = max(d_mean, mean_change)
+                d_cov  = max(d_cov, cov_change)
 
-        return max_mean_change, max_cov_change
+        self.d_mean = d_mean
+        self.d_cov  = d_cov
+
+        return d_mean, d_cov
 
     def evaluate_train_error(self):
         return self.evaluate_error(self.tensor.train_entries, self.tensor.train_vals)

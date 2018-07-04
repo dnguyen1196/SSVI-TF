@@ -1,8 +1,17 @@
+# Problem with robust TF
+
+- why it works for matrix but not for tensor -> look at derivations for tensor case
+
+- why d_cov always 0 -> implementation problem??
+
+- ada-delta and ada-grad hybrid approach? -> ok that seems to work , not bad
+
+- d_mean -> average d_mean instead of max?, or both
+
+- why does the d_mean always shoot up? when the iterates get near the 'optimum'????
+(is it the w parameter????? -> at near the optimum, w is phi"/phi)
+
 # Check the code for robust TF
-- The error is increasing, why?
-  + Check the normal pdf + derivatives
-  + More samples? - tried, no improvements yet
-  + N - N update causes error to decrease :|\
   
  - Try with matrix case?  N-N
  -> at least for the matrix case it makes some initial progress :| this is very
