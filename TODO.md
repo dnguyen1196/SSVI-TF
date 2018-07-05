@@ -20,6 +20,8 @@ with the expectation??
 
 - why does d_cov stay the same regardless of the choice of cov_eta??
 
+- Test on data that actually have noise!
+
 # Check the code for robust TF
   
  - Try with matrix case?  N-N

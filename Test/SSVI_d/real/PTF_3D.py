@@ -3,6 +3,7 @@ warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
 import numpy as np
+np.random.seed(seed=314)
 
 from Model.TF_Models import Posterior_Full_Covariance
 from SSVI.SSVI_TF_d import SSVI_TF_d
@@ -31,5 +32,7 @@ mean_update = "S"
 cov_update  = "N"
 factorizer = SSVI_TF_d(tensor, rank=D, \
                            mean_update=mean_update, cov_update=cov_update, \
+                           k1=256, k2=64,\
                            mean0=mean0, cov0=cov0)
-factorizer.factorize(report=50)
+
+factorizer.factorize(report=10)
