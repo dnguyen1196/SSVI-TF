@@ -82,7 +82,7 @@ class SSVI_TF(object):
 
     def factorize(self, report=1000):
         self.report = report
-        update_column_pointer = [0] * self.order
+        update_column_pointer = [0 for _ in range(self.order)]
         start = time.time()
         iteration = 0
 
@@ -95,14 +95,15 @@ class SSVI_TF(object):
                 # in the dim-th dimension
 
                 # self.update_natural_params(dim, col, iteration)
-                self.update_natural_param_batch(dim, col, iteration)
+                self.update_natural_param_batch(dim, col)
 
-                self.update_hyper_parameter(dim, iteration)
+                self.update_hyper_parameter(dim)
 
             # Move on to the next column of the hidden matrices
             for dim in range(self.order):
                 if (update_column_pointer[dim] + 1 == self.dims[dim]):
                     self.time_step[dim] += 1  # increase time step
+
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.dims[dim]
 
@@ -115,9 +116,8 @@ class SSVI_TF(object):
                 break
 
             iteration += 1
-        return
 
-    def update_hyper_parameter(self, dim, iteration):
+    def update_hyper_parameter(self, dim):
         """
         :param dim:
         :return:
@@ -130,14 +130,14 @@ class SSVI_TF(object):
 
         self.pSigma[dim] = sigma/(M*self.D)
 
-    def update_natural_param_batch(self, dim, i, iteration):
+    def update_natural_param_batch(self, dim, i):
         observed = self.tensor.find_observed_ui(dim, i)
 
         if len(observed) > self.batch_size:
             observed_idx = np.random.choice(len(observed), self.batch_size, replace=False)
             observed_subset = np.take(observed, observed_idx, axis=0)
         else:
-            observed_subset = np.copy(observed)
+            observed_subset = observed
 
         (m, S) = self.posterior.get_vector_distribution(dim, i)
         coords = np.array([entry[0] for entry in observed_subset])
@@ -303,6 +303,7 @@ class SSVI_TF(object):
                     vj_sample = np.random.multivariate_normal(mi, np.diag(Si), size=k)
                 else:
                     vj_sample = np.random.multivariate_normal(mi, Si, size=k)
+                # print (vj_sample.shape)
 
                 vjs_batch[num, :, :] = np.multiply(vjs_batch[num, :, :], vj_sample)
 

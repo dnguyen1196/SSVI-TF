@@ -4,12 +4,21 @@
 
 - why d_cov always 0 -> implementation problem??
 
+- The axis is off?
+
 - ada-delta and ada-grad hybrid approach? -> ok that seems to work , not bad
 
 - d_mean -> average d_mean instead of max?, or both
 
 - why does the d_mean always shoot up? when the iterates get near the 'optimum'????
 (is it the w parameter????? -> at near the optimum, w is phi"/phi)
+
+- the derivative is biased? what does it mean for the estimate to be biased? But we work
+with the expectation??
+
+- Try first looking at the case of complete conditionals
+
+- why does d_cov stay the same regardless of the choice of cov_eta??
 
 # Check the code for robust TF
   

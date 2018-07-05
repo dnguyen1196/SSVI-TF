@@ -1,0 +1,86 @@
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  3.352973699569702
+Tensor dimensions:  [50, 50, 50]
+Optimization metrics:
+Using Ada Grad
+Mean update scheme:  S
+Covariance update :  N
+k1 samples =  256  k2 samples =  64
+eta =  1  cov eta =  0.01  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |    dw
+    10       62.39      0.2242     0.2215     3.1623     4.4721      0.0
+    20       121.88     0.1952     0.1932     3.1623     4.4721      0.0
+    30       182.13     0.1692     0.1683     3.1623     4.4721      0.0
+    40       243.11     0.156      0.1556     3.1623     4.4721      0.0
+    50       304.66     0.1443     0.1454     3.1623     4.4721      0.0
+    60       365.97     0.1233     0.1242     3.1623     4.4721      0.0
+    70       427.47     0.109      0.1089     3.1623     4.4721      0.0
+    80       489.22     0.1006     0.1007     3.1623     4.4721      0.0
+    90       550.66     0.0916     0.0916     3.1623     4.4721      0.0
+   100       612.18     0.0789     0.0787     3.1619     1.1841      0.0
+   110       673.69     0.0724     0.0721     3.1619     1.1841      0.0
+   120       735.28     0.0688     0.0685     3.1619     1.1841      0.0
+   130       796.89     0.0659     0.0659     3.1619     1.1841      0.0
+   140       858.29     0.0617     0.0617     3.1553     1.1841      0.0
+   150       919.88     0.0603     0.0602     3.0062     0.0002      0.0
+   160       981.39     0.0587     0.0586     3.0062     0.0002      0.0
+   170      1043.01     0.0576     0.0576     3.0062     0.0002      0.0
+   180      1104.78     0.0568     0.0565     3.0062     0.0002      0.0
+   190      1166.58     0.0569     0.0567     3.0062     0.0002      0.0
+   200      1228.33     0.0557     0.0554     2.809      0.0001      0.0
+   210      1290.23     0.0545     0.0542     2.809      0.0001      0.0
+   220      1352.04     0.054      0.0538     2.809      0.0001      0.0
+   230      1413.64     0.0534     0.0531     2.809      0.0001      0.0
+   240      1475.35     0.0508     0.0507     2.809      0.0001      0.0
+   250      1537.05     0.0507     0.0506     2.1585      0.0        0.0
+   260      1598.86     0.0507     0.0505     2.1585      0.0        0.0
+   270      1660.74     0.0504     0.0502     2.1585      0.0        0.0
+   280      1722.71     0.051      0.0506     2.1585      0.0        0.0
+   290      1784.79     0.051      0.0507     2.1585      0.0        0.0
+   300      1846.67     0.0506     0.0505     2.4942      0.0        0.0
+   310      1908.77     0.0503     0.0502     2.4942      0.0        0.0
+   320       1970.8     0.0502     0.0501     2.4942      0.0        0.0
+   330      2032.69     0.0499     0.0499     2.4942      0.0        0.0
+   340      2094.82     0.0492     0.0491     2.4942      0.0        0.0
+   350      2156.73     0.0485     0.0482     2.426       0.0        0.0
+   360      2218.87     0.0486     0.0482     2.426       0.0        0.0
+   370      2280.69     0.0485     0.0483     2.426       0.0        0.0
+   380      2342.43     0.0486     0.0482     2.426       0.0        0.0
+   390      2404.33     0.0481     0.0479     2.426       0.0        0.0
+   400       2466.3     0.0477     0.0476     2.3237      0.0        0.0
+   410      2528.07     0.0475     0.0475     2.3237      0.0        0.0
+   420      2590.07     0.0477     0.0476     2.3237      0.0        0.0
+   430      2652.19     0.0472     0.047      2.3237      0.0        0.0
+   440      2714.23     0.0471     0.0468     2.3237      0.0        0.0
+   450       2776.1     0.0466     0.0462     2.1792      0.0        0.0
+   460      2838.18     0.0466     0.0462     2.1792      0.0        0.0
+   470      2900.38     0.0464     0.0461     2.1792      0.0        0.0
+   480      2962.21     0.047      0.0466     2.1792      0.0        0.0
+   490      3024.33     0.0471     0.0467     2.1792      0.0        0.0
+   500      3086.17     0.0466     0.0464     1.8942      0.0        0.0
+   510      3148.16     0.0465     0.0462     1.8942      0.0        0.0
+   520      3210.11     0.0465     0.0462     1.8942      0.0        0.0
+   530      3271.99     0.0463     0.046      1.9235      0.0        0.0
+   540      3333.95     0.0466     0.0462     1.9235      0.0        0.0
+   550      3396.09     0.0461     0.0457     1.9235      0.0        0.0
+   560      3458.08     0.0463     0.0459     1.9235      0.0        0.0
+   570       3519.9     0.0462     0.0459     1.9235      0.0        0.0
+Traceback (most recent call last):
+  File "/home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py", line 34, in <module>
+    factorizer.factorize(report=10)
+  File "/home/duc/Documents/Research/SSVI-TF/SSVI/SSVI_TF_interface.py", line 98, in factorize
+    self.update_natural_param_batch(dim, col)
+  File "/home/duc/Documents/Research/SSVI-TF/SSVI/SSVI_TF_interface.py", line 147, in update_natural_param_batch
+    di, Di, si = self.estimate_di_Di_si_complete_conditional_batch(dim, i, coords, ys, m, S)
+  File "/home/duc/Documents/Research/SSVI-TF/SSVI/SSVI_TF_robust.py", line 144, in estimate_di_Di_si_complete_conditional_batch
+    return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+  File "/home/duc/Documents/Research/SSVI-TF/SSVI/SSVI_TF_robust.py", line 62, in estimate_di_Di_si_batch
+    di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(ys, mean_batch, vjs_batch, ws_batch)
+  File "/home/duc/Documents/Research/SSVI-TF/SSVI/SSVI_TF_robust.py", line 102, in approximate_di_Di_si_with_second_layer_samplings
+    - 1/p[k] * np.outer(v[k, :]*p2[k], v[k, :]*p2[k]))
+  File "/home/duc/Documents/Research/SSVI-TF/venv/lib/python3.5/site-packages/numpy/core/numeric.py", line 1076, in outer
+    return multiply(a.ravel()[:, newaxis], b.ravel()[newaxis,:], out)
+KeyboardInterrupt
+
+Process finished with exit code 1

@@ -7,7 +7,7 @@ np.random.seed(seed=317)
 # For control and comparison
 # Generate synthesize data, true, this is what we try to recover
 
-dims     = [50, 50]
+dims     = [10, 10]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3]
@@ -22,13 +22,13 @@ D = 20
 mean0 = np.ones((D,)) * 5
 cov0 = np.eye(D)
 
-mean_update = "N"
-cov_update  = "S"
+mean_update = "S"
+cov_update  = "N"
 
 factorizer  = SSVI_TF_robust(data, rank=D, \
                             mean_update=mean_update, cov_update=cov_update, \
                             mean0=mean0, cov0=cov0,\
-                            k1=256, k2=128, \
-                            window_size=10, eta=1, cov_eta=1, sigma_eta=1)
+                            k1=256, k2=64, \
+                            window_size=10, eta=1, cov_eta=0.01, sigma_eta=1)
 
-factorizer.factorize(report=50)
+factorizer.factorize(report=5)

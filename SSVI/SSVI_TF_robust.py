@@ -44,17 +44,20 @@ class SSVI_TF_robust(SSVI_TF):
         # print("vjs ", vjs_batch.shape)
 
         # uis_batch.shape = (num_samples, k1, D)
+        # ....
+        # TODO: check dimensionality!!
         uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
-        # TODO: check if this is correct
-        # print(uis_batch.shape)
 
-        assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
-        assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+        assert(uis_batch.shape == vjs_batch.shape)
+
+        # assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
+        # assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
 
         ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
 
         # mean_batch.shape = (num_samples, k1)
         mean_batch = np.sum(np.multiply(vjs_batch, uis_batch), axis=2)
+        assert(mean_batch.shape == (num_subsamples, self.k1))
 
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(ys, mean_batch, vjs_batch, ws_batch)
 
@@ -88,23 +91,20 @@ class SSVI_TF_robust(SSVI_TF):
             v  = vjs_batch[num, :, :] # v.shape = (k1, D)
             w  = ws_batch[num, :]     # w.shape = (k1,)
 
-            di[num, :] = np.average(np.transpose(np.multiply(np.transpose(v), \
+            di[num, :] = np.mean(np.transpose(np.multiply(np.transpose(v), \
                                                              1/p * p1)), axis=0)
 
-            si[num]    = np.average(np.multiply(w, np.divide(p2, p))) / (8*np.square(self.w_sigma))
+            si[num]    = np.mean(w * p2 / p) / (8*np.square(self.w_sigma))
 
             for k in range(self.k1):
-                Di[num, :, :] += 0.5 / self.k1 /p[k] * \
+                Di[num, :, :] += 0.5 / self.k1 / p[k] * \
                                  (np.outer(v[k, :], v[k, :]) * p2[k] \
-                                  - 1/p[k] * np.outer(v[k]*p2[k], v[k]*p2[k]))
+                                  - 1/p[k] * np.outer(v[k, :]*p2[k], v[k, :]*p2[k]))
 
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
         si = np.sum(si)
 
-        # print("di.shape ", di.shape)
-        # print("Di.shape ", Di.shape)
-        # print("si.shape ", si.shape)
         return di, Di, si
 
     def estimate_expected_derivatives_pdf_batch(self, ys, mean_batch, ws_batch):
@@ -130,14 +130,13 @@ class SSVI_TF_robust(SSVI_TF):
             # For each num_samples, fs.shape = (k2, k1)
             fs = np.random.normal(mean_batch[num], ws_batch[num], size=(self.k2, self.k1))
 
-            pdf[num, :]       = np.average(self.likelihood.pdf(ys[num], fs, s), axis=0)
-            fst_deriv[num, :] = np.average(self.likelihood.fst_derivative_pdf(ys[num], fs, s), axis=0)
-            snd_deriv[num, :] = np.average(self.likelihood.snd_derivative_pdf(ys[num], fs, s), axis=0)
+            pdf[num, :]       = np.mean(self.likelihood.pdf(ys[num], fs, s), axis=0)
+            fst_deriv[num, :] = np.mean(self.likelihood.fst_derivative_pdf(ys[num], fs, s), axis=0)
+            snd_deriv[num, :] = np.mean(self.likelihood.snd_derivative_pdf(ys[num], fs, s), axis=0)
 
         # assert (pdf.shape == (num_samples, self.k1))
         # assert (fst_deriv.shape == (num_samples, self.k1))
         # assert (snd_deriv.shape == (num_samples, self.k1))
-
         return pdf, fst_deriv, snd_deriv
 
     # TODO: implement closed form version

@@ -1403,3 +1403,20 @@ Traceback (most recent call last):
 KeyboardInterrupt
 
 Process finished with exit code 1
+
+
+
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/real/PTF_3D_robust.py
+Generating synthetic data ...
+Generating synthetic data took:  3.2831714153289795
+Tensor dimensions:  [50, 50, 50]
+Optimization metrics:
+Using Ada Grad
+Mean update scheme:  N
+Covariance update :  S
+k1 samples =  512  k2 samples =  128
+eta =  1  cov eta =  1  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |    dw
+    5        87.36      0.3406     0.3354     3.1623       0         0.0
+    10       161.21     0.3919     0.3869     3.1623       0         0.0
+    15       234.92     0.4467     0.4418     3.1623       0         0.0
