@@ -36,6 +36,8 @@ class SSVI_TF(object):
         self.k2     = k2
         self.batch_size = batch_size
 
+        self.predict_num_samples = 64
+
         self.pmu             = np.ones((self.D,))
         self.pSigma          = np.ones((len(self.dims),))
 
@@ -309,23 +311,10 @@ class SSVI_TF(object):
 
         return vjs_batch
 
-    def sample_vjs(self, othercols, otherdims):
-        uis = np.ones((self.D,))
-        for dim, col in enumerate(othercols):
-            # Sample from the approximate posterior
-            (mi, Si) = self.posterior.get_vector_distribution(otherdims[dim], col)
-
-            if Si.ndim == 1:
-                uj_sample = np.random.multivariate_normal(mi, np.diag(Si))
-            else:
-                uj_sample = np.random.multivariate_normal(mi, Si)
-
-            uis = np.multiply(uis, uj_sample)
-
-        return uis
-
     """
+    
     Functions to report metrics (error, vlb, etc)
+    
     """
     def report_metrics(self, iteration, start, mean_change, cov_change):
         if iteration == self.report:
@@ -370,13 +359,13 @@ class SSVI_TF(object):
         else:
             print("")
 
-
     def estimate_vlb(self, entries, values):
-        vlb = 0.0
-        for i in range(len(values)):
-            entry = entries[i]
-            val   = values[i]
-            m, S  = self.compute_posterior_param(entry)
+        # vlb = 0.0
+        # for i in range(len(values)):
+        #     entry = entries[i]
+        #     val   = values[i]
+        #     m, S  = self.compute_posterior_param(entry)
+        raise NotImplementedError
 
     def estimate_expected_log_likelihood(self, m, S):
         raise NotImplementedError
@@ -440,6 +429,28 @@ class SSVI_TF(object):
 
         return error/len(entries)
 
+    """
+    Predict entry function
+    """
+    def predict_entry(self, entry):
+        # If not count-valued tensor
+        if self.likelihood_type != "poisson":
+            u = np.ones((self.D,))
+            for dim, col in enumerate(entry):
+                m, _ = self.posterior.get_vector_distribution(dim, col)
+                u = np.multiply(u, m)
+            m = np.sum(u)
+            return self.predict_y_given_m(m)
+        else:
+            # if predicting count values, need to do estimation
+            # res = self.compute_expected_count_sampling(entry)
+            m, S = self.compute_posterior_param(entry)
+            res  = self.compute_expected_count_quadrature(m, S)
+            return np.rint(res)
+
+    """
+    Bridge function
+    """
     def predict_y_given_m(self, m):
         if self.likelihood_type == "normal":
             return m
@@ -448,6 +459,10 @@ class SSVI_TF(object):
         else:
             raise Exception("Unidentified likelihood type")
 
+    """
+    Functions to do count value prediction through the use of gauss-hermite 
+    quadrature
+    """
     def compute_fyi(self, k, yi, m, s):
         A  = self.link_fun(np.sqrt(2 * s) * yi + m)
         temp1 = np.power(A,k)/math.factorial(k)
@@ -495,7 +510,7 @@ class SSVI_TF(object):
 
         return m, S
 
-    def compute_expected_count(self, m, S):
+    def compute_expected_count_quadrature(self, m, S):
         num = self.max_count - self.min_count + 1
         probs = np.zeros((num, ))
         sum_probs = 0.
@@ -509,17 +524,29 @@ class SSVI_TF(object):
 
         return np.sum(np.multiply(probs, np.array(k_array)))/sum_probs
 
-    def predict_entry(self, entry):
-        # If not count-valued tensor
-        if self.likelihood_type != "poisson":
-            u = np.ones((self.D,))
-            for dim, col in enumerate(entry):
-                m, _ = self.posterior.get_vector_distribution(dim, col)
-                u = np.multiply(u, m)
-            m = np.sum(u)
-            return self.predict_y_given_m(m)
+    def compute_expected_count_sampling(self, entry):
+        ms = np.ones((self.predict_num_samples, self.D))
+
+        for dim, i in enumerate(entry):
+            m, S = self.posterior.get_vector_distribution(dim, i)
+            samples = np.random.multivariate_normal(m, S, size=(self.predict_num_samples))
+            ms = ms * samples
+
+        ms = np.sum(ms, axis=1) # fs.shape == (self.predict_num_samples, )
+
+        if self.noise_added:
+            ws = np.random.rayleigh(self.w_sigma**2, size=self.predict_num_samples)
+
+            # TODO: check dimensionality
+            fs = np.random.normal(ms, ws, size=(self.predict_num_samples))
+            fs = self.link_fun(fs)
+            counts = self.likelihood.sample(fs, (self.predict_num_samples))
         else:
-            # if predicting count values, need to do estimation
-            m, S = self.compute_posterior_param(entry)
-            res  = self.compute_expected_count(m, S)
-            return np.rint(res)
+            fs = ms
+            fs = self.link_fun(fs)
+            counts = self.likelihood.sample(fs, (self.predict_num_samples))
+
+        return np.mean(counts)
+
+
+

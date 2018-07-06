@@ -26,7 +26,7 @@ def poisson_link_no_exception(f):
 def poisson_link(f):
     try:
         res = np.log(1 + np.exp(f))
-        return max(res, epsilon)
+        return np.maximum(res, epsilon)
     except Warning:
         return f
 

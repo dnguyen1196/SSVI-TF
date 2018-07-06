@@ -15,7 +15,7 @@ covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
 data = Tensor()
 
 # data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
-data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1, noise=1)
+data.synthesize_real_data(dims, means, covariances, hidden_D, 0.2, 1, noise=1)
 
 ################## MODEL and FACTORIZATION #########################
 # The below two modules have to agree with one another on dimension
@@ -31,6 +31,6 @@ cov_update  = "N"
 factorizer  = SSVI_TF_robust(data, rank=D, \
                             mean_update=mean_update, cov_update=cov_update, \
                             mean0=mean0, cov0=cov0, k1=128, k2=64, \
-                            window_size=10, eta=1, cov_eta=0.1, sigma_eta=1)
+                            eta=1, cov_eta=0.1, sigma_eta=1)
 
 factorizer.factorize(report=50)

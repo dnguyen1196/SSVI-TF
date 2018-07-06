@@ -10,6 +10,9 @@ class NormalDistribution(object):
     def __str__(self):
         return "NormalDistribution"
 
+    def sample(self, m, s, k):
+        return np.random.normal(m, s, size=k)
+
     def pdf(self, y, m, s):
         res = norm.pdf(y, m, s)
         return np.maximum(res, self.epsilon)

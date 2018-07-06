@@ -8,7 +8,7 @@ class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                  mean0=None, cov0=None,\
                  sigma0=1,k1=50, k2=50, batch_size=128, \
-                 window_size=5, eta=1, cov_eta=1, sigma_eta=1, scheme="adagrad"):
+                 eta=1, cov_eta=1, sigma_eta=1):
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
                  mean0, cov0, \
@@ -114,17 +114,12 @@ class SSVI_TF_robust(SSVI_TF):
         :param ws_batch:    (num_samples, k1)
         :return:
         """
-        # print("mean_batch: ", mean_batch.shape)
-        # print("ys: ", ys.shape)
-
         s = self.likelihood_param
 
         num_samples = np.size(ys, axis=0)
         pdf         = np.zeros((num_samples, self.k1))
         fst_deriv   = np.zeros_like(pdf)
         snd_deriv   = np.zeros_like(pdf)
-
-        # print("ws_batch.norm ", np.linalg.norm(ws_batch))
 
         for num in range(num_samples):
             # For each num_samples, fs.shape = (k2, k1)
@@ -134,52 +129,8 @@ class SSVI_TF_robust(SSVI_TF):
             fst_deriv[num, :] = np.mean(self.likelihood.fst_derivative_pdf(ys[num], fs, s), axis=0)
             snd_deriv[num, :] = np.mean(self.likelihood.snd_derivative_pdf(ys[num], fs, s), axis=0)
 
-        # assert (pdf.shape == (num_samples, self.k1))
-        # assert (fst_deriv.shape == (num_samples, self.k1))
-        # assert (snd_deriv.shape == (num_samples, self.k1))
         return pdf, fst_deriv, snd_deriv
 
     # TODO: implement closed form version
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
-
-    def compute_stepsize_mean_param(self, dim, i, mGrad):
-        return self.compute_stepsize_mean_param_ada_grad(dim, i, mGrad)
-
-    def compute_stepsize_mean_param_ada_grad(self, dim, i, mGrad):
-        acc_grad = self.ada_acc_grad[dim][:, i]
-        grad_sqr = np.square(mGrad)
-        self.ada_acc_grad[dim][:, i] += grad_sqr
-
-        # return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        if self.likelihood_type != "poisson":
-            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        else:
-            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-
-    def compute_stepsize_mean_param_ada_delta(self, dim, i, mGrad):
-        if self.d_mean < 0.4:
-            # When reaching sufficiently small d_mean, switch to ada grad
-            del(self.ada_delta_grad)
-            del(self.ada_delta_ptr)
-            self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
-            self.compute_stepsize_mean_param = self.compute_stepsize_mean_param_ada_grad
-            self.eta = 0.1 # Also change eta?
-
-            print("Switching to ada grad with eta = ", self.eta)
-            return self.compute_stepsize_mean_param_ada_grad(dim, i, mGrad)
-
-        delta_grads = self.ada_delta_grad[dim][i, :, :]
-
-        cur = self.ada_delta_ptr[dim][i]
-        ptr = cur % self.window_size
-        delta_grads[:, ptr] = np.square(mGrad)
-
-        if cur + 1 >= self.window_size:
-            step_size = self.eta / np.sqrt(np.sum(delta_grads, axis=1))
-        else:
-            step_size = self.eta / np.sqrt(np.sum(delta_grads[:, : cur + 1], axis=1))
-        # print("step size: ", step_size )
-        self.ada_delta_ptr[dim][i] = cur + 1
-
-        return step_size
