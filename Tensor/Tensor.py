@@ -25,7 +25,7 @@ class Tensor(object):
         elif self.datatype == "count":
             self.link_fun = lambda m : probs.poisson_link(m)
 
-    def synthesize_real_data(self, dims, means, covariances, D=10, train=0.8, sparsity=0.5):
+    def synthesize_real_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=1.):
         """
         :param dims:
         :param means:
@@ -51,7 +51,7 @@ class Tensor(object):
         train_size    = int(observed_num * train) # training set size
 
         observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices)
+            = self.organize_observed_entries(observed_num, train_size, dims, matrices, noise)
 
         self.test_entries  = observed_entries[train_size :]
         self.test_vals     = observed_vals[train_size :]
@@ -61,7 +61,7 @@ class Tensor(object):
         end = time.time()
         print("Generating synthetic data took: ", end- start)
 
-    def synthesize_binary_data(self, dims, D, train, sparsity):
+    def synthesize_binary_data(self, dims, D=20, train=0.8, sparsity=1, noise=1.):
         print("Generating synthetic data ... ")
         start = time.time()
         self.dims = dims
@@ -82,7 +82,7 @@ class Tensor(object):
         train_size    = int(observed_num * train) # training set size
 
         observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices)
+            = self.organize_observed_entries(observed_num, train_size, dims, matrices, noise)
 
         self.test_entries  = observed_entries[train_size :]
         self.test_vals     = observed_vals[train_size :]
@@ -92,7 +92,7 @@ class Tensor(object):
         end = time.time()
         print("Generating synthetic data took: ", end- start)
 
-    def synthesize_count_data(self, dims, D, train, sparsity):
+    def synthesize_count_data(self, dims, D=20, train=0.8, sparsity=1, noise=1.):
         """
         :param dims:
         :param D:
@@ -122,7 +122,7 @@ class Tensor(object):
         train_size    = int(observed_num * train) # training set size
 
         observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices)
+            = self.organize_observed_entries(observed_num, train_size, dims, matrices, noise)
 
         self.test_entries  = observed_entries[train_size :]
         self.test_vals     = observed_vals[train_size :]
@@ -146,7 +146,7 @@ class Tensor(object):
             matrix[i, :] = np.random.multivariate_normal(m, S)
         return matrix
 
-    def organize_observed_entries(self, observed_num, train_size, dims, matrices):
+    def organize_observed_entries(self, observed_num, train_size, dims, matrices, noise):
         ndim = len(dims)
         observed_entries = self.generate_unique_coords(observed_num)
 
@@ -157,6 +157,10 @@ class Tensor(object):
             nrows = dims[dim]
             self.observed_by_id[dim] = [[] for _ in range(nrows)]
 
+
+        if noise != 0:
+            s_array = np.random.normal(0, noise, size=(len(observed_entries,)))
+
         for entry_num, entry in enumerate(observed_entries):
             ui = np.ones_like(matrices[0][0, :])
             for dim in range(ndim):
@@ -164,7 +168,11 @@ class Tensor(object):
                 ui  = np.multiply(ui, matrices[dim][row_num, :])
 
             m = np.sum(ui)
-            f = self.actual_value(m)
+            if noise != 0:
+                s = s_array[entry_num]
+            else:
+                s = 0
+            f = self.actual_value(m + s)
 
             observed_vals[entry_num] = f
             if entry_num < train_size:

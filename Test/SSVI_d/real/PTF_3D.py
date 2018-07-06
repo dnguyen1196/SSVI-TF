@@ -15,8 +15,10 @@ dims     = [50, 50, 50]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
-tensor = Tensor()
-tensor.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
+data = Tensor()
+
+# tensor.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
+data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1, noise=1)
 
 
 ################## MODEL and FACTORIZATION #########################
@@ -30,9 +32,9 @@ cov0  = np.eye(D)
 ############################### FACTORIZATION ##########################
 mean_update = "S"
 cov_update  = "N"
-factorizer = SSVI_TF_d(tensor, rank=D, \
-                           mean_update=mean_update, cov_update=cov_update, \
-                           k1=256, k2=64,\
-                           mean0=mean0, cov0=cov0)
+factorizer = SSVI_TF_d(data, rank=D, \
+                       mean_update=mean_update, cov_update=cov_update, \
+                       k1=128, k2=64, \
+                       mean0=mean0, cov0=cov0)
 
-factorizer.factorize(report=10)
+factorizer.factorize(report=50)

@@ -3,7 +3,7 @@ import numpy as np
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 from Tensor.Tensor import Tensor
 
-np.random.seed(seed=314) # For control and comparison
+np.random.seed(seed=317) # For control and comparison
 # Generate synthesize data, true, this is what we try to recover
 
 dims     = [50, 50, 50]
@@ -11,7 +11,9 @@ hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
 data = Tensor()
-data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
+
+# data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
+data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1, noise=1)
 
 ################## MODEL and FACTORIZATION #########################
 # The below two modules have to agree with one another on dimension
@@ -26,7 +28,7 @@ cov_update  = "N"
 
 factorizer = SSVI_TF_simple(data, rank=D, \
                                    mean_update=mean_update, cov_update=cov_update, \
-                                   k1=256, k2=64,\
+                                   k1=128, k2=64,\
                                    mean0=mean0, cov0=cov0)
 
-factorizer.factorize(report=10)
+factorizer.factorize(report=50)
