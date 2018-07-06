@@ -18,7 +18,7 @@ covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
 data = Tensor()
 
 # tensor.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
-data.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1, noise=1)
+data.synthesize_real_data(dims, means, covariances, hidden_D, 0.2, 1, noise=1)
 
 
 ################## MODEL and FACTORIZATION #########################
