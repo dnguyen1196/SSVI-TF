@@ -1,13 +1,12 @@
+# Other data types
+- Check old commits to see what went differently?
+- Visually run through code
+- Check formulation another time
+- Problem with data generation?
+- Check formulation of first log derivative, why is i sigmoid(y * m)
+
 # Problem with robust TF
 
-- why d_cov always 0 -> implementation problem??
-
-- the derivative is biased? what does it mean for the estimate to be biased? But we work
-with the expectation??
-
-- Try first looking at the case of complete conditionals
-
-- Test on data that actually have noise! -> tensor.synthesize_data()
 
 
 # other data types

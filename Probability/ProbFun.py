@@ -15,10 +15,8 @@ def sigmoid(x):
         res = 1./(1 + np.exp(-x))
         return res
     except Warning:
-        if x < 0:
-            return epsilon
-        else:
-            return 1 - epsilon
+        print("Overflow")
+        return np.minimum(np.maximum(x, epsilon), 1 - epsilon)
 
 def poisson_link_no_exception(f):
     return np.log(1 + np.exp(f))
@@ -28,6 +26,7 @@ def poisson_link(f):
         res = np.log(1 + np.exp(f))
         return np.maximum(res, epsilon)
     except Warning:
+        print("warning")
         return f
 
 

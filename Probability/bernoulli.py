@@ -10,26 +10,36 @@ class BernoulliDistribution(object):
     def __str__(self):
         return "BernoulliDistribution"
 
-    def sample(self, m, k):
-        return np.random.binomial(1, m, size=k)
+    def sample(self, m, s=None, k=1):
+        return np.random.binomial(1, sigmoid(m), size=k)
 
-    def pdf(self, y, m):
-        return bernoulli.pmf((y+1)/2, sigmoid(m))
+    def pdf(self, y, m, s=None):
+        return sigmoid(np.multiply(y, m))
 
-    def fst_derivative_pdf(self, y, m):
-        return y * sigmoid(m) * (1 - sigmoid(m))
+    def fst_derivative_pdf(self, y, m, s=None):
+        temp = np.multiply(y, sigmoid(np.multiply(y, m)))
+        res  = np.multiply(temp, np.subtract(1, sigmoid(np.multiply(y, m))))
+        return res
 
-    def snd_derivative_pdf(self, y, m):
-        s = sigmoid(m)
-        return y * np.square(1 - s) * s - y * np.square(s) * (1 - s)
+    def snd_derivative_pdf(self, y, m, s=None):
+        s = sigmoid(y * m)
+        # return y * np.square(1 - s) * s - y * np.square(s) * (1 - s)
+        return s * (1-s) * (1 - 2*s)
 
-    def log_pdf(self, y, m):
-        return y * (1 - sigmoid(y * m))
+    def log_pdf(self, y, m, s=None):
+        return np.log(sigmoid(np.multiply(y, m)))
 
-    def fst_derivative_log_pdf(self, y, m):
-        return y * (1 - sigmoid(y * m))
+    def fst_derivative_log_pdf(self, y, m, s=None):
+        # ym = y * m
+        # print("ym: ", ym.shape)
+        # sym = sigmoid(-ym)
+        # print("sym: ", sym.shape)
+        # res =  y * (1. - sigmoid(y * m))
+        # res =  y * sigmoid(y * m)
+        res = np.multiply(y, sigmoid(-np.multiply(y, m)))
+        return res
 
-    def snd_derivative_log_pdf(self, y, m):
-        return -np.square(y) * sigmoid(y * m) * sigmoid(-y * m)
-
+    def snd_derivative_log_pdf(self, y, m, s=None):
+        # return -np.square(y) * sigmoid(y * m) * sigmoid(-y * m)
+        return np.multiply(-sigmoid(np.multiply (y, m)), sigmoid(-np.multiply(y, m)))
 

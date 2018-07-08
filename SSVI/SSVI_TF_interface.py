@@ -16,7 +16,7 @@ import time
 
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                        mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=128, \
+                        mean0=None, cov0=None, sigma0=1,k1=64, k2=64, batch_size=128, \
                         eta=1, cov_eta=1, sigma_eta=1):
 
         self.tensor = tensor
@@ -312,9 +312,7 @@ class SSVI_TF(object):
         return vjs_batch
 
     """
-    
     Functions to report metrics (error, vlb, etc)
-    
     """
     def report_metrics(self, iteration, start, mean_change, cov_change):
         if iteration == self.report:

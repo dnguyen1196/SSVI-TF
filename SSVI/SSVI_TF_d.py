@@ -5,10 +5,10 @@ from numpy.linalg import inv
 
 class SSVI_TF_d(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                 mean0=None, cov0=None, sigma0=1,k1=30, k2=10, batch_size=100):
+                 mean0=None, cov0=None, sigma0=1, k1=64, k2=64, batch_size=100):
 
         super(SSVI_TF_d, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
-                 mean0, cov0, sigma0,k1, k2, batch_size)
+                 mean0, cov0, sigma0, k1, k2, batch_size)
 
         self.pmu             = np.ones((self.D,))
         self.pSigma          = np.ones((len(self.dims),))
@@ -46,7 +46,6 @@ class SSVI_TF_d(SSVI_TF):
         for num in range(num_samples):
             fs = np.random.normal(mean_batch[num, :], cov_batch[num, :], size=(self.k2, self.k1))
             fst_deriv_batch[num] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s), axis=0)
-            # print("fst " , fst_deriv_batch.shape)
             snd_deriv_batch[num] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
 
         return fst_deriv_batch, snd_deriv_batch
