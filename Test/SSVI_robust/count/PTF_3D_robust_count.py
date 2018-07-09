@@ -1,6 +1,6 @@
 import numpy as np
 
-from SSVI.SSVI_TF_d import SSVI_TF_d
+from SSVI.SSVI_TF_robust import SSVI_TF_robust
 from Tensor.Tensor import Tensor
 
 # np.random.seed(seed=317) # For control and comparisons
@@ -25,7 +25,8 @@ cov0 = np.eye(D)
 
 mean_update = "S"
 cov_update  = "N"
-factorizer = SSVI_TF_d(tensor, rank=D, \
+factorizer = SSVI_TF_robust(tensor, rank=D, \
                                    mean_update=mean_update, cov_update=cov_update, \
+                                   eta=1, cov_eta=0.0000000001,\
                                    mean0=mean0, cov0=cov0)
-factorizer.factorize(report=50)
+factorizer.factorize(report=1)

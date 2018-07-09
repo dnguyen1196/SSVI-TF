@@ -78,6 +78,9 @@ class SSVI_TF_robust(SSVI_TF):
         # All shapes are (num_samples, k1)
         phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
 
+        # print("phi_prime/phi: ", phi_fst/ phi)
+        # print("phi_snd/phi: ", phi_snd/ phi)
+
         di = np.zeros((num_samples, self.D))
         Di = np.zeros((num_samples, self.D, self.D))
         si = np.zeros((num_samples,))

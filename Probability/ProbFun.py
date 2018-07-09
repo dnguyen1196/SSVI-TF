@@ -8,7 +8,7 @@ warnings.filterwarnings("error")
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
-epsilon = 0.00000001
+epsilon = 0.0000000001
 
 def sigmoid(x):
     try:
@@ -25,6 +25,7 @@ def poisson_link(f):
     try:
         res = np.log(1 + np.exp(f))
         return np.maximum(res, epsilon)
+        # return res
     except Warning:
         print("warning")
         return f

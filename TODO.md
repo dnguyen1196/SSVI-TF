@@ -1,11 +1,17 @@
 # Other data types
-- Check old commits to see what went differently?
-- Visually run through code
-- Check formulation another time
-- Problem with data generation?
-- Check formulation of first log derivative, why is i sigmoid(y * m)
+- Implement function to do estimates by sampling -> both for bernoulli (with noise)
+and poisson (<- most important?)
+- First figure out the predictive integral
+
+- Thought experiment: running simple model without noise prediction? Is it better than
+deterministic model? ->
+- Simple binary with sampling prediction -> same error forever?? wy
 
 # Problem with robust TF
+- Need to fix robust count 
+- Robust binary and real seem to be working ? => just need more data to look at
+
+Look at derivative for poisson case
 
 
 

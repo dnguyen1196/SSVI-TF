@@ -36,7 +36,7 @@ class SSVI_TF(object):
         self.k2     = k2
         self.batch_size = batch_size
 
-        self.predict_num_samples = 64
+        self.predict_num_samples = 32
 
         self.pmu             = np.ones((self.D,))
         self.pSigma          = np.ones((len(self.dims),))
@@ -164,8 +164,7 @@ class SSVI_TF(object):
             self.w_sigma   = w_sigma
 
         # Measures the change in the parameters from previous iterations
-        # print("di.norm = ", np.linalg.norm(di), "Di.norm ", np.linalg.norm(Di) \
-        #       , "dm = ", np.linalg.norm(m_next - m), "; dS = ", np.linalg.norm(S_next - S, "fro"))
+        # print("dmean: ", np.linalg.norm(m_next - m), " dcov: ", np.linalg.norm(S_next - S, 'fro'))
 
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
@@ -232,13 +231,8 @@ class SSVI_TF(object):
                       - np.inner(L, self.pSigma_inv) + 2 * np.dot(L, Di_acc))
 
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-            # print("covStep: ", covStep)
-            # print(np.linalg.norm(covGrad))
-            # print(np.min(covGrad))
             L_next  = L + covStep * covGrad
-            # print(np.linalg.norm(L_next - L, "fro"))
             S_next  = np.dot(L, np.transpose(L))
-            # print(np.linalg.norm(S_next - S, 'fro'))
 
         elif self.cov_update == "N":
             covGrad = (self.pSigma_inv - 2 * Di_acc)
@@ -348,9 +342,9 @@ class SSVI_TF(object):
         if self.likelihood_type == "poisson":
             print('{:^10} {:^10}'\
                   .format(np.around(\
-                            self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), dec), \
+                            self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), 2), \
                           np.around(\
-                            self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), dec)), end=" ")
+                            self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), 2)), end=" ")
 
         if self.noise_added:
             print('{:^10}'.format(np.around(self.w_changes, dec)))
@@ -418,8 +412,11 @@ class SSVI_TF(object):
 
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
+
             elif self.likelihood_type == "bernoulli":
                 error += 1 if predict != correct else 0
+                # error += np.abs(predict - correct)/abs(correct)
+
             elif self.likelihood_type == "poisson":
                 error += np.abs(predict - correct)
             else:
@@ -430,22 +427,49 @@ class SSVI_TF(object):
     """
     Predict entry function
     """
+    # Working version
+    # def predict_entry(self, entry):
+    #     # If not count-valued tensor
+    #     if self.likelihood_type != "poisson":
+    #         u = np.ones((self.D,))
+    #         for dim, col in enumerate(entry):
+    #             m, _ = self.posterior.get_vector_distribution(dim, col)
+    #             u = np.multiply(u, m)
+    #         m = np.sum(u)
+    #         return self.predict_y_given_m(m)
+    #     else:
+    #         # if predicting count values, need to do estimation
+    #         # res = self.compute_expected_count_sampling(entry)
+    #         m, S  = self.compute_posterior_param(entry)
+    #         res   = self.compute_expected_count_quadrature(m, S)
+    #         return np.rint(res)
+
+    # Test version
     def predict_entry(self, entry):
-        # If not count-valued tensor
-        if self.likelihood_type != "poisson":
+        if self.likelihood_type == "normal":
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):
                 m, _ = self.posterior.get_vector_distribution(dim, col)
                 u = np.multiply(u, m)
-            m = np.sum(u)
-            return self.predict_y_given_m(m)
-        else:
-            # if predicting count values, need to do estimation
-            # res = self.compute_expected_count_sampling(entry)
-            m, S = self.compute_posterior_param(entry)
-            res  = self.compute_expected_count_quadrature(m, S)
-            return np.rint(res)
+            return np.sum(u)
 
+        # elif self.likelihood_type == "bernoulli" and not self.noise_added:
+        elif self.likelihood_type == "bernoulli":
+            u = np.ones((self.D,))
+            for dim, col in enumerate(entry):
+                m, _ = self.posterior.get_vector_distribution(dim, col)
+                u = np.multiply(u, m)
+
+            return 1 if np.sum(u) > 0 else -1
+
+        else:
+            res = self.estimate_expected_observation_sampling(entry)
+            if self.likelihood_type == "bernoulli":
+                return res
+                # return 1 if res > 0 else -1
+            elif self.likelihood_type == "poisson":
+                # return np.rint(res)
+                return res
     """
     Bridge function
     """
@@ -522,6 +546,10 @@ class SSVI_TF(object):
 
         return np.sum(np.multiply(probs, np.array(k_array)))/sum_probs
 
+
+    """
+    Functions to do prediction via samplings
+    """
     def compute_expected_count_sampling(self, entry):
         ms = np.ones((self.predict_num_samples, self.D))
 
@@ -546,5 +574,21 @@ class SSVI_TF(object):
 
         return np.mean(counts)
 
+    def estimate_expected_observation_sampling(self, entry):
+        ms = np.ones((self.predict_num_samples, self.D))
 
+        for dim, i in enumerate(entry):
+            m, S = self.posterior.get_vector_distribution(dim, i)
+            samples = np.random.multivariate_normal(m, S, size=(self.predict_num_samples))
+            ms = ms * samples
 
+        ms = np.sum(ms, axis=1) # fs.shape == (self.predict_num_samples, )
+
+        if self.noise_added:
+            ws = np.random.rayleigh(np.square(self.w_sigma), size=(self.predict_num_samples,))
+            fs = np.random.normal(ms, ws, size=(self.predict_num_samples, self.predict_num_samples))
+        else: # deterministic model
+            fs = ms
+
+        predict = self.link_fun(fs)
+        return np.mean(predict)

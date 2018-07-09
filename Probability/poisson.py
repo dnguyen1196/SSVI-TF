@@ -1,7 +1,7 @@
 import numpy as np
 from Probability.ProbFun import poisson_link, sigmoid
 from scipy.stats import poisson
-from scipy.misc import factorial
+from scipy.special import factorial
 
 
 class PoissonDistribution(object):
@@ -15,13 +15,19 @@ class PoissonDistribution(object):
         return np.random.poisson(m, size=k)
 
     def pdf(self, y, m, s=None):
-        return poisson.pmf(y, poisson_link(m))
+        A = poisson_link(m)
+        res = np.divide(np.multiply(np.power(A, y), np.exp(-A)), factorial(y))
+        return res
 
     def fst_derivative_pdf(self, y, m, s=None):
-        pmf = self.pdf(y, poisson_link(m))
-        s   = sigmoid(m)
-        A   = poisson_link(m)
-        return 1/factorial(y) * pmf * s * (y/ A - 1)
+        # pdf * sigmoid * (y/A(f) - 1)
+        pdf  = self.pdf(y, poisson_link(m))
+        s    = sigmoid(m)
+        A    = poisson_link(m)
+
+        temp = np.divide(y, A)
+        temp = np.subtract(temp, 1)
+        return np.multiply(pdf, np.multiply(s, temp))
 
     def snd_derivative_pdf(self, y, m, s=None):
         pmf = self.pdf(y, poisson_link(m))
@@ -29,9 +35,14 @@ class PoissonDistribution(object):
         A   = poisson_link(m)
         pmf_prime = self.fst_derivative_pdf(y, m)
 
-        temp1 = (y/A - 1) * (pmf_prime * s + s*(1-s)*pmf)
-        temp2 = pmf * s * (-y)/np.square(A) * s
-        return 1/factorial(y) * (temp1 + temp2)
+        # temp1 = (y/A - 1) * (pmf_prime * s + s*(1-s)*pmf)
+        # temp2 = pmf * s * (-y)/np.square(A) * s
+        # return 1/factorial(y) * (temp1 + temp2)
+        temp1 = np.multiply(pmf_prime, np.multiply(s, np.divide(y, A) - 1))
+
+        temp  = np.multiply(-y/np.square(A), s) + np.multiply(y/A - 1, np.multiply(s, 1-s))
+        temp2 = np.multiply(pmf, np.multiply(s, temp))
+        return temp1 + temp2
 
     def log_pdf(self, y, m, s=None):
         return poisson.logpmf(y, poisson_link(m))
