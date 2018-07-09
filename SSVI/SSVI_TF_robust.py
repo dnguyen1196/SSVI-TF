@@ -100,14 +100,22 @@ class SSVI_TF_robust(SSVI_TF):
             si[num]    = np.mean(w * p2 / p) / (8*np.square(self.w_sigma))
 
             for k in range(self.k1):
-                Di[num, :, :] += 0.5 / self.k1 / p[k] * \
-                                 (np.outer(v[k, :], v[k, :]) * p2[k] \
-                                  - 1/p[k] * np.outer(v[k, :]*p2[k], v[k, :]*p2[k]))
+                pre = 0.5 / np.multiply(self.k1, p[k])
+                temp1 = np.multiply(np.outer(v[k, :], v[k, :]), p2[k])
+
+                v_phi = np.multiply(v[k, :], p2[k])
+                temp2 = np.multiply(1/p[k], np.outer(v_phi, v_phi))
+
+                # Di[num, :, :] += 0.5 / self.k1 / p[k] * \
+                #                  (np.outer(v[k, :], v[k, :]) * p2[k] \
+                #                   - 1/p[k] * np.outer(v[k, :]*p2[k], v[k, :]*p2[k]))
+                Di[num, :, :] += np.multiply(pre, np.subtract(temp1, temp2))
 
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
         si = np.sum(si)
-
+        # print("di: ", np.linalg.norm(di))
+        # print("Di: ", np.linalg.norm(Di, "fro"))
         return di, Di, si
 
     def estimate_expected_derivatives_pdf_batch(self, ys, mean_batch, ws_batch):

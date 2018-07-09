@@ -21,13 +21,13 @@ class PoissonDistribution(object):
 
     def fst_derivative_pdf(self, y, m, s=None):
         # pdf * sigmoid * (y/A(f) - 1)
-        pdf  = self.pdf(y, poisson_link(m))
-        s    = sigmoid(m)
         A    = poisson_link(m)
+        pdf  = np.divide(np.multiply(np.power(A, y), np.exp(-A)), factorial(y))
+        s    = sigmoid(m)
 
-        temp = np.divide(y, A)
-        temp = np.subtract(temp, 1)
-        return np.multiply(pdf, np.multiply(s, temp))
+        temp = np.subtract(np.divide(y, A), 1)
+        res  = np.multiply(pdf, np.multiply(s, temp))
+        return res
 
     def snd_derivative_pdf(self, y, m, s=None):
         pmf = self.pdf(y, poisson_link(m))
@@ -40,8 +40,10 @@ class PoissonDistribution(object):
         # return 1/factorial(y) * (temp1 + temp2)
         temp1 = np.multiply(pmf_prime, np.multiply(s, np.divide(y, A) - 1))
 
-        temp  = np.multiply(-y/np.square(A), s) + np.multiply(y/A - 1, np.multiply(s, 1-s))
-        temp2 = np.multiply(pmf, np.multiply(s, temp))
+        temp  = np.multiply(-np.divide(y, np.square(A)), np.square(s)) \
+                + np.multiply(y/A - 1, np.multiply(s, 1-s))
+        temp2 = np.multiply(pmf, temp)
+
         return temp1 + temp2
 
     def log_pdf(self, y, m, s=None):

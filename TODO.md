@@ -14,6 +14,15 @@ deterministic model? ->
 Look at derivative for poisson case
 
 
+- wrong derivative
+-more smaples?
+Generating synthetic data ... 
+Generating synthetic data took:  0.30700016021728516
+max count is:  18
+di:  466.776431359
+Di:  7.56139410722e+89 -> This is the problem, Di why is it like this?
+-> may be some thing cancel out -> causes this problem?
+
 
 # other data types
 - implement sample function

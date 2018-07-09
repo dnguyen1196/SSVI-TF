@@ -17,7 +17,7 @@ import time
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                         mean0=None, cov0=None, sigma0=1,k1=64, k2=64, batch_size=128, \
-                        eta=1, cov_eta=1, sigma_eta=1):
+                        eta=1, cov_eta=1, sigma_eta=1, max_iteration=2000):
 
         self.tensor = tensor
         self.dims   = tensor.dims
@@ -35,6 +35,7 @@ class SSVI_TF(object):
         self.k1     = k1
         self.k2     = k2
         self.batch_size = batch_size
+        self.max_iteration = max_iteration
 
         self.predict_num_samples = 32
 
@@ -86,9 +87,8 @@ class SSVI_TF(object):
         self.report = report
         update_column_pointer = [0 for _ in range(self.order)]
         start = time.time()
-        iteration = 0
 
-        while True:
+        for iteration in range(self.max_iteration):
             current = time.time()
 
             for dim in range(self.order):
@@ -116,8 +116,6 @@ class SSVI_TF(object):
 
             if max(mean_change, cov_change) < self.epsilon:
                 break
-
-            iteration += 1
 
     def update_hyper_parameter(self, dim):
         """
@@ -299,6 +297,7 @@ class SSVI_TF(object):
                     vj_sample = np.random.multivariate_normal(mi, np.diag(Si), size=k)
                 else:
                     vj_sample = np.random.multivariate_normal(mi, Si, size=k)
+
                 # print (vj_sample.shape)
 
                 vjs_batch[num, :, :] = np.multiply(vjs_batch[num, :, :], vj_sample)
