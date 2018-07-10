@@ -23,6 +23,14 @@ di:  466.776431359
 Di:  7.56139410722e+89 -> This is the problem, Di why is it like this?
 -> may be some thing cancel out -> causes this problem?
 
+-> see vjk norm and phi_snd/phi?
+
+-> May be if the norm of covgrad is too big -> then ignore this update for now?
+Capping the covariance update seems to work for now? -> Need to figure out exactly what's up
+
+-> It seems that for the poisson robust model the covariance update
+is highly unstable -> recommend using the diagonal update?
+
 
 # other data types
 - implement sample function

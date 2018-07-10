@@ -1,7 +1,7 @@
 from SSVI.SSVI_TF_interface import SSVI_TF
 from Model.TF_Models import Posterior_Full_Covariance
 import numpy as np
-from numpy.linalg import inv
+from numpy.linalg import inv, norm
 
 
 class SSVI_TF_robust(SSVI_TF):
@@ -44,7 +44,6 @@ class SSVI_TF_robust(SSVI_TF):
         # print("vjs ", vjs_batch.shape)
 
         # uis_batch.shape = (num_samples, k1, D)
-        # ....
         # TODO: check dimensionality!!
         uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
 
@@ -94,6 +93,14 @@ class SSVI_TF_robust(SSVI_TF):
             v  = vjs_batch[num, :, :] # v.shape = (k1, D)
             w  = ws_batch[num, :]     # w.shape = (k1,)
 
+            # print("p2**2/p1: ", norm(np.square(p2)/p1))
+            # print("p1/p: ", norm(p1 / p))
+            # print("v: ", norm(v))
+            # if norm(np.square(p2)/p1) > 1:
+            #     print("num: ", num)
+            #     print("ys[num] ", ys[num])
+            #     print("mean_batch ", mean_batch)
+
             di[num, :] = np.mean(np.transpose(np.multiply(np.transpose(v), \
                                                              1/p * p1)), axis=0)
 
@@ -114,8 +121,10 @@ class SSVI_TF_robust(SSVI_TF):
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
         si = np.sum(si)
+
         # print("di: ", np.linalg.norm(di))
         # print("Di: ", np.linalg.norm(Di, "fro"))
+
         return di, Di, si
 
     def estimate_expected_derivatives_pdf_batch(self, ys, mean_batch, ws_batch):
@@ -145,3 +154,32 @@ class SSVI_TF_robust(SSVI_TF):
     # TODO: implement closed form version
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+
+    def compute_stepsize_cov_param(self, dim, i, covGrad):
+        if self.likelihood_type == "poisson":
+            try:
+                cov_norm = norm(covGrad, "fro")
+                if cov_norm > 10:
+                    return 0.
+            except RuntimeWarning:
+                return 0.
+
+            return self.cov_eta/(self.time_step[dim] + 1)
+
+        return self.cov_eta/(self.time_step[dim] + 1)
+
+    def predict_entry(self, entry):
+        if self.likelihood_type == "normal":
+            u = np.ones((self.D,))
+            for dim, col in enumerate(entry):
+                m, _ = self.posterior.get_vector_distribution(dim, col)
+                u = np.multiply(u, m)
+            return np.sum(u)
+
+        res = self.estimate_expected_observation_sampling(entry)
+        if self.likelihood_type == "bernoulli":
+            return res
+            # return 1 if res > 0 else -1
+        elif self.likelihood_type == "poisson":
+            # return np.rint(res)
+            return res

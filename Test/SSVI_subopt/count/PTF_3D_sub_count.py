@@ -3,7 +3,7 @@ import numpy as np
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 from Tensor.Tensor import Tensor
 
-# np.random.seed(seed=317) # For control and comparisons
+np.random.seed(seed=317) # For control and comparisons
 
 # Generate synthesize tensor, true, this is what we try to recover
 dims        = [20, 20, 20]

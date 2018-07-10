@@ -1,0 +1,17 @@
+/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_robust/count/PTF_3D_robust_count.py
+Generating synthetic data ...
+Generating synthetic data took:  0.29901742935180664
+max count is:  18
+Tensor dimensions:  [20, 20, 20]
+Optimization metrics:
+Using Ada Grad
+Mean update scheme:  S
+Covariance update :  N
+k1 samples =  32  k2 samples =  32
+eta =  1  cov eta =  0.01  sigma eta =  1
+iteration |   time   | test_err | train_err|  d_mean  |   d_cov  | test_nll | train_nll     dw
+    50       49.71     10.1416    10.2765     0.2463       0       4923.55    19478.25     0.0
+   100       108.99     7.3782     7.4573     0.1637       0       4468.86    17626.87     0.0
+   150       168.27     5.8541     6.0297     0.1383       0       4216.59    16585.47     0.0
+   200       227.49     5.0498     5.1308     0.1194       0       4055.25    15925.35     0.0
+   250       286.81     4.4761     4.6054     0.1098       0       3957.05    15520.54     0.0

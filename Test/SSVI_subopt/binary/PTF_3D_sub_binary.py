@@ -3,10 +3,10 @@ import numpy as np
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 from Tensor.Tensor import Tensor
 
-# np.random.seed(seed=317) # For control and comparisons
+np.random.seed(seed=317) # For control and comparisons
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims        = [50, 50, 50]
+dims        = [20, 20, 20]
 hidden_D    = 20
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
