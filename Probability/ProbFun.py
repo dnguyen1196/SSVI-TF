@@ -2,113 +2,57 @@ import numpy as np
 from numpy.random import multivariate_normal
 import warnings
 
-warnings.filterwarnings("error")
+# warnings.filterwarnings("error")
+np.seterr(all="ignore")
 
 """
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
-epsilon = 0.0000001
+epsilon = 1e-8
+
+# def sigmoid(x):
+#     try:
+#         res = 1./(1 + np.exp(-x))
+#         return np.minimum(np.maximum(x, epsilon), 1 - epsilon)
+#     except Warning:
+#         print("Overflow")
+#         return np.minimum(np.maximum(x, epsilon), 1 - epsilon)
 
 def sigmoid(x):
+    res = 1./(1 + np.exp(-x))
+    res = np.nan_to_num(res)
+    return np.minimum(np.maximum(res, epsilon), 1 - epsilon)
+
+def sigmoid_scalar(x):
     try:
         res = 1./(1 + np.exp(-x))
         return res
     except Warning:
-        print("Overflow")
-        return np.minimum(np.maximum(x, epsilon), 1 - epsilon)
+        if x < 0:
+            return epsilon
+        else:
+            return 1
 
-def poisson_link_no_exception(f):
-    return np.log(1 + np.exp(f))
+# sigmoid = np.vectorize(sigmoid_scalar)
+
+# def poisson_link(f):
+#     try:
+#         res = np.log(1 + np.exp(f))
+#         return np.maximum(res, epsilon)
+#     except Warning:
+#         print("warning")
+#         return f
 
 def poisson_link(f):
+    res = np.log(1 + np.exp(f))
+    return np.maximum(res, epsilon)
+
+def poisson_link_scalar(f):
     try:
         res = np.log(1 + np.exp(f))
         return np.maximum(res, epsilon)
-        # return res
     except Warning:
-        print("warning")
-        return f
+        return np.maximum(res, epsilon)
 
-
-"""
-Normal distribution
-"""
-def normal_sample(mu, sig):
-    return np.random.normal(mu, sig)
-
-def multivariate_normal_sample(m, S):
-    return multivariate_normal(m, S)
-
-def normal_log_likelihood(y, f, s):
-    print(y, f)
-    return -0.5*np.log(2 * np.pi * np.sqrt(s)) - np.square(y-f)/(2*s)
-
-def normal_fst_log_derivative(y, f, s):
-    return (y-f)/s
-
-def normal_snd_log_derivative(y, f, s):
-    return -1/s
-
-
-"""
-Bernoulli distribution (binary-valued data)
-"""
-def bernoulli_sample(f, s=None):
-    return np.random.binomial(1, sigmoid(f))
-
-def bernoulli_fst_derivative(y, f, s=None):
-    return y * (1 - sigmoid(y * f))
-
-def bernoulli_snd_derivative(y, f, s=None):
-    return -np.square(y) * sigmoid(y * f) * sigmoid(-y * f)
-
-
-"""
-Poisson distribution (count-valued data)
-"""
-def poisson_sample(f, s=None):
-    return np.random.poisson(f)
-
-def poisson_fst_derivative(y, f, s=None):
-    sigma = sigmoid(f)
-    A     = poisson_link(f)
-    res   = sigma * (np.divide(y, A) - 1)
-    return res
-
-def poisson_snd_derivative(y, f, s=None):
-    sigma = sigmoid(f)
-    A     = poisson_link(f)
-    temp1 = sigma * (1-sigma) * (np.divide(y, A) - 1)
-    temp2 = y * np.square(sigma)/np.square(A)
-    res = temp1 - temp2
-    return min(0, res)
-
-"""
-MultiNormal distribution
-"""
-def sample(name, args):
-    if name == "multivariate_normal":
-        return multivariate_normal_sample(*args)
-    else:
-        return normal_sample(*args)
-
-def fst_derivative(name, args):
-    if name == "normal":
-        return normal_fst_log_derivative(*args)
-    elif name == "poisson":
-        return poisson_fst_derivative(*args)
-    elif name == "bernoulli":
-        return bernoulli_fst_derivative(*args)
-
-def snd_derivative(name, args):
-    if name == "normal":
-        return normal_snd_log_derivative(*args)
-    elif name == "poisson":
-        return poisson_snd_derivative(*args)
-    elif name == "bernoulli":
-        return bernoulli_snd_derivative(*args)
-
-def log_likelihood(name, args):
-    if name == "normal":
-        return normal_log_likelihood(*args)
+# poisson_link = np.vectorize(poisson_link_scalar)

@@ -5,7 +5,7 @@ from scipy.stats import bernoulli
 
 class BernoulliDistribution(object):
     def __init__(self):
-        return
+        self.epsilon = 1e-8
 
     def __str__(self):
         return "BernoulliDistribution"
@@ -14,7 +14,9 @@ class BernoulliDistribution(object):
         return np.random.binomial(1, sigmoid(m), size=k)
 
     def pdf(self, y, m, s=None):
-        return sigmoid(np.multiply(y, m))
+        res = sigmoid(np.multiply(y, m))
+        # print(res)
+        return res
 
     def fst_derivative_pdf(self, y, m, s=None):
         temp = np.multiply(y, sigmoid(np.multiply(y, m)))
@@ -27,7 +29,7 @@ class BernoulliDistribution(object):
         return s * (1-s) * (1 - 2*s)
 
     def log_pdf(self, y, m, s=None):
-        return np.log(sigmoid(np.multiply(y, m)))
+        return np.log(self.pdf(y, m, s))
 
     def fst_derivative_log_pdf(self, y, m, s=None):
         # ym = y * m

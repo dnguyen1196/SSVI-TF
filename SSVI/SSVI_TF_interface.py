@@ -242,10 +242,15 @@ class SSVI_TF(object):
         return S_next
 
     def update_sigma_param(self, si_acc, scale):
+        # print(si_acc)
+        # print("scale: ", scale)
         si_acc *= scale
         w_grad = -1/(2 * np.square(self.w_tau)) + si_acc
         w_step = self.compute_stepsize_sigma_param(w_grad)
+        # print("w_step: ", w_step)
+
         update = (1-w_step) * (-0.5/np.square(self.w_sigma)) + w_step * w_grad
+        # print("update: ", update)
         next_sigma = np.sqrt(-0.5/update)
         return next_sigma
 

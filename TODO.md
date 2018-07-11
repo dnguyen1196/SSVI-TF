@@ -13,9 +13,7 @@ deterministic model? ->
 
 Look at derivative for poisson case
 
-
 - wrong derivative
--more smaples?
 Generating synthetic data ... 
 Generating synthetic data took:  0.30700016021728516
 max count is:  18
@@ -31,18 +29,20 @@ Capping the covariance update seems to work for now? -> Need to figure out exact
 -> It seems that for the poisson robust model the covariance update
 is highly unstable -> recommend using the diagonal update?
 
+-> Removing the negative eigenvalues dosent seem to do the trick -> but capping the covariance 
+seems to produce very shitty results?
+-> diagonal covariance?
 
-# other data types
-- implement sample function
 
-# Others
-- sigma**2 vs just sigma (take note of this in current implementation)
-- Implement function to compute the VLB
-- Report RSME
+-> The problem with doing batch computation -> how to handle individual 
+entry special cases
+-> Keep in mind that it must still work for binary deterministic and
+binary simple!
 
-# poisson prediction
-- Look at Rishit's code
-- Basically doing sampling -> algebraic transformation to avoid looping -> saves cost
+
+-> what numpy does with the warning/ does it assign infinity? or 0
+
+
 
 # Questions: 
 - Is it better to do approximation or sampling

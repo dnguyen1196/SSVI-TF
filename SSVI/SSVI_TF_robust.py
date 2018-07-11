@@ -1,7 +1,7 @@
 from SSVI.SSVI_TF_interface import SSVI_TF
 from Model.TF_Models import Posterior_Full_Covariance
 import numpy as np
-from numpy.linalg import inv, norm
+from numpy.linalg import inv, norm, eig, eigh
 
 
 class SSVI_TF_robust(SSVI_TF):
@@ -93,9 +93,6 @@ class SSVI_TF_robust(SSVI_TF):
             v  = vjs_batch[num, :, :] # v.shape = (k1, D)
             w  = ws_batch[num, :]     # w.shape = (k1,)
 
-            # print("p2**2/p1: ", norm(np.square(p2)/p1))
-            # print("p1/p: ", norm(p1 / p))
-            # print("v: ", norm(v))
             # if norm(np.square(p2)/p1) > 1:
             #     print("num: ", num)
             #     print("ys[num] ", ys[num])
@@ -113,17 +110,15 @@ class SSVI_TF_robust(SSVI_TF):
                 v_phi = np.multiply(v[k, :], p2[k])
                 temp2 = np.multiply(1/p[k], np.outer(v_phi, v_phi))
 
-                # Di[num, :, :] += 0.5 / self.k1 / p[k] * \
-                #                  (np.outer(v[k, :], v[k, :]) * p2[k] \
-                #                   - 1/p[k] * np.outer(v[k, :]*p2[k], v[k, :]*p2[k]))
                 Di[num, :, :] += np.multiply(pre, np.subtract(temp1, temp2))
 
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
         si = np.sum(si)
 
-        # print("di: ", np.linalg.norm(di))
-        # print("Di: ", np.linalg.norm(Di, "fro"))
+        print("di: ", np.linalg.norm(di))
+        print("Di: ", np.linalg.norm(Di, "fro"))
+        print("si: ", si)
 
         return di, Di, si
 
@@ -151,22 +146,45 @@ class SSVI_TF_robust(SSVI_TF):
 
         return pdf, fst_deriv, snd_deriv
 
-    # TODO: implement closed form version
+    # TODO: implement closed form version if exists
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
-    def compute_stepsize_cov_param(self, dim, i, covGrad):
-        if self.likelihood_type == "poisson":
-            try:
-                cov_norm = norm(covGrad, "fro")
-                if cov_norm > 10:
-                    return 0.
-            except RuntimeWarning:
-                return 0.
+    def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
+        if self.cov_update == "S":
+            L = cholesky(S)
+            covGrad = self.remove_negative_eigenvals(\
+                      np.triu(inv(np.multiply(L, np.eye(self.D))) \
+                      - np.inner(L, self.pSigma_inv) + 2 * np.dot(L, Di_acc)))
 
-            return self.cov_eta/(self.time_step[dim] + 1)
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            L_next  = L + covStep * covGrad
+            S_next  = np.dot(L, np.transpose(L))
 
-        return self.cov_eta/(self.time_step[dim] + 1)
+        elif self.cov_update == "N":
+            covGrad = self.remove_negative_eigenvals(self.pSigma_inv - 2 * Di_acc)
+            covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
+            S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return S_next
+
+    def remove_negative_eigenvals(self, covGrad):
+        eigvals, eigvec = eig(covGrad)
+        eigvals    = np.maximum(np.real(eigvals), 0.)
+        # w_pos  = np.minimum(np.real(w), 0.)
+        eigvals    = self.scale_eigenvals(eigvals)
+        eigvec     = np.real(eigvec)
+        w_pos_vt   = np.multiply(np.transpose(eigvec), eigvals[:, np.newaxis])
+
+        # w_pos_vt = np.dot(np.diag(w), np.transpose(v))
+        # print(norm(w_pos_vt))
+        return np.dot(eigvec, w_pos_vt)
+
+    def scale_eigenvals(self, eigvals):
+        return eigvals/norm(eigvals)
+        # return eigvals
 
     def predict_entry(self, entry):
         if self.likelihood_type == "normal":

@@ -6,7 +6,7 @@ from scipy.special import factorial
 
 class PoissonDistribution(object):
     def __init__(self):
-        return
+        self.epsilon = 1e-8
 
     def __str__(self):
         return "PoissonDistribution"
@@ -14,34 +14,47 @@ class PoissonDistribution(object):
     def sample(self, m, s=None, k=1):
         return np.random.poisson(m, size=k)
 
-    def pdf(self, y, m, s=None):
+    def pdf(self, y, m, S=None):
         A = poisson_link(m)
-        res = np.divide(np.multiply(np.power(A, y), np.exp(-A)), factorial(y))
+        # res = np.divide(np.multiply(np.power(A, y), np.exp(-A)), factorial(y))
+        res = poisson.pmf(y, poisson_link(m))
+
+        res = np.maximum(res, self.epsilon)
+
+        # print("res: ", res)
         return res
 
-    def fst_derivative_pdf(self, y, m, s=None):
+    def fst_derivative_pdf(self, y, m, S=None):
         # pdf * sigmoid * (y/A(f) - 1)
         A    = poisson_link(m)
-        pdf  = self.pdf(y, m, s)
-        s    = sigmoid(m)
+        pdf  = self.pdf(y, m, S)
+        sigm = sigmoid(m)
+
+        assert(sigm.shape == m.shape)
+        assert(A.shape == m.shape)
 
         temp = np.subtract(np.divide(y, A), 1)
-        res  = np.multiply(pdf, np.multiply(s, temp))
+        res  = np.multiply(pdf, np.multiply(sigm, temp))
+
         return res
 
     def snd_derivative_pdf(self, y, m, s=None):
         pdf = self.pdf(y, poisson_link(m))
-        s   = sigmoid(m)
+        sigm   = sigmoid(m)
         A   = poisson_link(m)
         pmf_prime = self.fst_derivative_pdf(y, m)
 
-        # temp1 = (y/A - 1) * (pmf_prime * s + s*(1-s)*pmf)
-        # temp2 = pmf * s * (-y)/np.square(A) * s
-        # return 1/factorial(y) * (temp1 + temp2)
-        temp1 = np.multiply(pmf_prime, np.multiply(s, np.divide(y, A) - 1))
+        assert(sigm.shape == m.shape)
+        assert(A.shape == m.shape)
 
-        temp  = np.multiply(-np.divide(y, np.square(A)), np.square(s)) \
-                + np.multiply(y/A - 1, np.multiply(s, 1-s))
+        # temp1 = (y/A - 1) * (pmf_prime * sigm + sigm*(1-sigm)*pmf)
+        # temp2 = pmf * sigm * (-y)/np.square(A) * sigm
+        # return 1/factorial(y) * (temp1 + temp2)
+
+        temp1 = np.multiply(pmf_prime, np.multiply(sigm, np.divide(y, A) - 1))
+
+        temp  = np.multiply(-np.divide(y, np.square(A)), np.square(sigm)) \
+                + np.multiply(y / A - 1, np.multiply(sigm, 1 - sigm))
 
         temp2 = np.multiply(pdf, temp)
 
