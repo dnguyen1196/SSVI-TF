@@ -304,7 +304,6 @@ class SSVI_TF(object):
                     vj_sample = np.random.multivariate_normal(mi, Si, size=k)
 
                 # print (vj_sample.shape)
-
                 vjs_batch[num, :, :] = np.multiply(vjs_batch[num, :, :], vj_sample)
 
         return vjs_batch
@@ -457,8 +456,8 @@ class SSVI_TF(object):
                 u = np.multiply(u, m)
             return np.sum(u)
 
-        # elif self.likelihood_type == "bernoulli" and not self.noise_added:
-        elif self.likelihood_type == "bernoulli":
+        elif self.likelihood_type == "bernoulli" and not self.noise_added:
+        # elif self.likelihood_type == "bernoulli":
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):
                 m, _ = self.posterior.get_vector_distribution(dim, col)
@@ -469,8 +468,9 @@ class SSVI_TF(object):
         else:
             res = self.estimate_expected_observation_sampling(entry)
             if self.likelihood_type == "bernoulli":
-                return res
-                # return 1 if res > 0 else -1
+                # return res
+                return 1 if res >1/2 else -1
+
             elif self.likelihood_type == "poisson":
                 # return np.rint(res)
                 return res

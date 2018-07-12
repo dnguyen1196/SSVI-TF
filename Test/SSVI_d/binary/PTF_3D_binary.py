@@ -34,4 +34,4 @@ factorizer = SSVI_TF_d(data, rank=D, \
                             k1=64, k2=64,\
                             mean0=mean0, cov0=cov0)
 
-factorizer.factorize(report=50)
+factorizer.factorize(report=10)

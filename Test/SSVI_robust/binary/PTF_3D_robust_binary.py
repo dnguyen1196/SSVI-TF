@@ -6,7 +6,7 @@ from Tensor.Tensor import Tensor
 np.random.seed(seed=317) # For control and comparisons
 
 # Generate synthesize tensor, true, this is what we try to recover
-dims        = [50, 50, 50]
+dims        = [20, 20, 20]
 hidden_D    = 20
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
@@ -35,4 +35,4 @@ factorizer = SSVI_TF_robust(data, rank=D, \
                             eta=1, cov_eta=0.001,\
                             mean0=mean0, cov0=cov0)
 
-factorizer.factorize(report=50)
+factorizer.factorize(report=10)

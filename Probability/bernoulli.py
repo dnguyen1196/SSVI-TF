@@ -16,6 +16,8 @@ class BernoulliDistribution(object):
     def pdf(self, y, m, s=None):
         res = sigmoid(np.multiply(y, m))
         # print(res)
+        # print(np.any(np.iszero(res)))
+        # print(not np.any(res))
         return res
 
     def fst_derivative_pdf(self, y, m, s=None):
@@ -26,7 +28,10 @@ class BernoulliDistribution(object):
     def snd_derivative_pdf(self, y, m, s=None):
         s = sigmoid(y * m)
         # return y * np.square(1 - s) * s - y * np.square(s) * (1 - s)
-        return s * (1-s) * (1 - 2*s)
+        res = s * (1-s) * (1 - 2*s)
+        # print(np.any(np.isnan(res)))
+
+        return res
 
     def log_pdf(self, y, m, s=None):
         return np.log(self.pdf(y, m, s))

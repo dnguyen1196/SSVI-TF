@@ -41,12 +41,17 @@ binary simple!
 
 
 -> what numpy does with the warning/ does it assign infinity? or 0
+-> problem (w_sigma becomes nan because the update is pos)
 
 
+-> Check simple prediction for binary -> bound is 1/2
+-> Data generation is faulty for binary lmao! sed
 
 # Questions: 
-- Is it better to do approximation or sampling
-
+- Complete main.py
+-> option on the command line that can be ported an run on tufts
+cluster
+-> 
 
 
 

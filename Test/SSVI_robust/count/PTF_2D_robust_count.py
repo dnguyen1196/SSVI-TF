@@ -28,7 +28,7 @@ cov_update  = "N"
 factorizer = SSVI_TF_robust(data, rank=D, \
                                    mean_update=mean_update, cov_update=cov_update, \
                                    eta=1, cov_eta=0.1,\
-                                   k1=32, k2=32,\
+                                   k1=64, k2=64,\
                                    mean0=mean0, cov0=cov0)
 
 factorizer.factorize(report=10)
