@@ -30,4 +30,5 @@ factorizer = SSVI_TF_robust(tensor, rank=D, \
                                    k1=64, k2=64,\
                                    eta=1, cov_eta=0.001,\
                                    mean0=mean0, cov0=cov0)
+
 factorizer.factorize(report=10)

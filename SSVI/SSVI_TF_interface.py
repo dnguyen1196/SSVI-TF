@@ -457,7 +457,6 @@ class SSVI_TF(object):
             return np.sum(u)
 
         elif self.likelihood_type == "bernoulli" and not self.noise_added:
-        # elif self.likelihood_type == "bernoulli":
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):
                 m, _ = self.posterior.get_vector_distribution(dim, col)
@@ -469,7 +468,7 @@ class SSVI_TF(object):
             res = self.estimate_expected_observation_sampling(entry)
             if self.likelihood_type == "bernoulli":
                 # return res
-                return 1 if res >1/2 else -1
+                return 1 if res > 1/2 else -1
 
             elif self.likelihood_type == "poisson":
                 # return np.rint(res)

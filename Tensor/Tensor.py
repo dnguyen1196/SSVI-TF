@@ -6,6 +6,8 @@ needed in data representation and storage.
 import  numpy as np
 import time
 from Probability import ProbFun as probs
+from abc import abstractclassmethod, abstractmethod
+
 
 class Tensor(object):
     def  __init__(self, datatype="real", binary_cutoff=0.0):
@@ -25,6 +27,95 @@ class Tensor(object):
         elif self.datatype == "count":
             self.link_fun = lambda m : probs.poisson_link(m)
 
+    """
+    """
+    def synthesize_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=1.):
+        """
+        :param dims:
+        :param means:
+        :param covariances:
+        :param D:
+        :param train:
+        :param sparsity:
+        :return:
+        """
+        print("Generating synthetic ", self.datatype , "valued data ... ")
+        start = time.time()
+        self.dims = dims
+        self.D = D
+        self.train = train
+        self.noise = noise
+
+        self.matrices = self.generate_hidden_matrices(means, covariances)
+
+        total         = np.prod(dims) # Total number of possible entries
+        observed_num  = int(total * sparsity) # Number of observed_by_id entries
+        train_size    = int(observed_num * train) # training set size
+
+        self.observed_entries = self.generate_unique_coords(observed_num)
+        self.observed_vals    \
+            = self.organize_observed_entries_by_column(self.observed_entries, train_size, noise)
+
+        self.test_entries  = self.observed_entries[train_size :]
+        self.test_vals     = self.observed_vals[train_size :]
+
+        self.train_entries = self.observed_entries[: train_size]
+        self.train_vals    = self.observed_vals[: train_size]
+
+        end = time.time()
+        print("Generating synthetic ", self.datatype, "valued data took: ", end- start)
+
+    @abstractmethod
+    def generate_hidden_matrices(self, means, covariances):
+        raise NotImplementedError
+
+    def reduce_train_size(self, train_ratio):
+        """
+
+        :param train_ratio:
+        :return:
+        """
+        new_train_size = int(self.train * train_ratio * len(self.observed_vals))
+
+        self.train_entries = self.observed_entries[: new_train_size]
+        self.train_vals    = self.observed_vals[: new_train_size]
+
+        for dim, nrows in enumerate(self.dims):
+            self.observed_by_id[dim] = [[] for _ in range(nrows)]
+
+        for i in range(new_train_size):
+            entry = self.observed_entries[i]
+            f     = self.observed_vals[i]
+            for dim, row_num in enumerate(entry):
+                self.observed_by_id[dim][row_num].append((entry, f))
+
+    def organize_observed_entries_by_column(self, observed_coords, train_size, noise):
+        self.noise = noise
+        ndim = len(self.dims)
+        observed_vals = [0] * len(observed_coords)
+        self.observed_by_id = [[] for _ in range(ndim)]
+
+        for dim, nrows in enumerate(self.dims):
+            self.observed_by_id[dim] = [[] for _ in range(nrows)]
+
+        for entry_num, entry in enumerate(observed_coords):
+            f = self.compute_entry_value(entry)
+            observed_vals[entry_num] = f
+
+            if entry_num < train_size:
+                for dim in range(ndim):
+                    row_num = entry[dim]
+                    self.observed_by_id[dim][row_num].append((entry, f))
+
+        return observed_vals
+
+    @abstractmethod
+    def compute_entry_value(self, entry):
+        raise NotImplementedError
+
+    """
+    THE OLD WAY OF GENERATING DATA
+    """
     def synthesize_real_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=1.):
         """
         :param dims:
@@ -35,7 +126,7 @@ class Tensor(object):
         :param sparsity:
         :return:
         """
-        print("Generating synthetic data ... ")
+        print("Generating synthetic real-valued data ... ")
         start = time.time()
         self.dims = dims
         self.datatype = "real"
@@ -43,6 +134,7 @@ class Tensor(object):
         ndim = len(dims)
         matrices = [[]] * ndim
         # Generate the random hidden matrices
+
         for i in range(ndim):
             matrices[i] = self.create_random_matrix(dims[i], D, means[i], covariances[i])
 
@@ -59,10 +151,11 @@ class Tensor(object):
         self.train_vals    = observed_vals[: train_size]
 
         end = time.time()
-        print("Generating synthetic data took: ", end- start)
+        print("Generating synthetic real-valued data took: ", end- start)
 
     def synthesize_binary_data(self, dims, D=20, train=0.8, sparsity=1, noise=1.):
-        print("Generating synthetic data ... ")
+        print("Generating synthetic binary data ... ")
+
         start = time.time()
         self.dims = dims
         self.datatype = "binary"
@@ -90,7 +183,7 @@ class Tensor(object):
         self.train_vals    = observed_vals[: train_size]
 
         end = time.time()
-        print("Generating synthetic data took: ", end- start)
+        print("Generating synthetic binary data took: ", end- start)
 
     def synthesize_count_data(self, dims, D=20, train=0.8, sparsity=1, noise=1.):
         """
@@ -100,7 +193,7 @@ class Tensor(object):
         :param sparsity:
         :return:
         """
-        print("Generating synthetic data ... ")
+        print("Generating synthetic count data ... ")
         start = time.time()
         self.dims = dims
         self.datatype = "count"
@@ -130,7 +223,7 @@ class Tensor(object):
         self.train_vals    = observed_vals[: train_size]
 
         end = time.time()
-        print("Generating synthetic data took: ", end- start)
+        print("Generating synthetic count data took: ", end- start)
         print("max count is: ", self.max_count)
 
     def create_random_matrix(self, nrow, ncol, m, S):
@@ -157,7 +250,6 @@ class Tensor(object):
             nrows = dims[dim]
             self.observed_by_id[dim] = [[] for _ in range(nrows)]
 
-
         if noise != 0:
             s_array = np.random.normal(0, noise, size=(len(observed_entries,)))
 
@@ -172,6 +264,7 @@ class Tensor(object):
                 s = s_array[entry_num]
             else:
                 s = 0
+
             f = self.actual_value(m + s)
 
             observed_vals[entry_num] = f
@@ -233,6 +326,7 @@ class Tensor(object):
         :param filename: 
         :return: 
         """
+        # TODO: implement when testing on real life datasets
         pass
 
     def verify_binary_entries(self, matrices):

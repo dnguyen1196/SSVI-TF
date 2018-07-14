@@ -1,11 +1,14 @@
-# Other data types
-- Implement function to do estimates by sampling -> both for bernoulli (with noise)
-and poisson (<- most important?)
-- First figure out the predictive integral
+# Testing
+- Implement function to perform learning curve investigation
+-> 0.8 data train data, 0.2 test -> then use 20%, 40%, ..., 100% of training data
+and see how it performs 
+-> Fix a constant number of iterations?
+-> output everything to a file
 
-- Thought experiment: running simple model without noise prediction? Is it better than
-deterministic model? ->
-- Simple binary with sampling prediction -> same error forever?? wy
+
+# Other data types
+- Robust count 3D -> why sigma update results in nan? (really interesting
+and weird)
 
 # Problem with robust TF
 - Need to fix robust count 
@@ -13,45 +16,24 @@ deterministic model? ->
 
 Look at derivative for poisson case
 
-- wrong derivative
-Generating synthetic data ... 
-Generating synthetic data took:  0.30700016021728516
-max count is:  18
-di:  466.776431359
-Di:  7.56139410722e+89 -> This is the problem, Di why is it like this?
--> may be some thing cancel out -> causes this problem?
-
 -> see vjk norm and phi_snd/phi?
-
 -> May be if the norm of covgrad is too big -> then ignore this update for now?
 Capping the covariance update seems to work for now? -> Need to figure out exactly what's up
 
--> It seems that for the poisson robust model the covariance update
-is highly unstable -> recommend using the diagonal update?
 
--> Removing the negative eigenvalues dosent seem to do the trick -> but capping the covariance 
-seems to produce very shitty results?
--> diagonal covariance?
-
-
--> The problem with doing batch computation -> how to handle individual 
-entry special cases
--> Keep in mind that it must still work for binary deterministic and
-binary simple!
-
-
--> what numpy does with the warning/ does it assign infinity? or 0
--> problem (w_sigma becomes nan because the update is pos)
+-> Removing the negative eigenvalues dosent seem to do the trick 
+-> but capping the covariance seems to produce very shitty results?
+-> diagonal covariance seems to be a good choice to deal with covariance problem
+in robust model
 
 
 -> Check simple prediction for binary -> bound is 1/2
--> Data generation is faulty for binary lmao! sed
+-> Data generation is faulty for binary lmao! no?
 
 # Questions: 
 - Complete main.py
 -> option on the command line that can be ported an run on tufts
 cluster
--> 
 
 
 
