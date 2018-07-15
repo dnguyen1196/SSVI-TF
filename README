@@ -1,25 +1,5 @@
-/home/duc/Documents/Research/SSVI-TF/venv/bin/python3 /home/duc/Documents/Research/SSVI-TF/Test/SSVI_subopt/real/PTF_3D_sub.py
-Generating synthetic data ... 
-Generating synthetic data took:  0.30713891983032227
-Tensor dimensions:  [100, 100, 10]
-Optimization metrics: 
-Mean update scheme:  S
-Covariance update :  N
-k1 samples =  20  k2 samples =  10
-eta =  1  cov eta =  1
-iteration |   time   | test_err | train_err|  d_mean  |   d_cov  | 
-    1         0.28      0.483      0.4729     3.1623     4.472    
-    2         0.76      0.4684     0.4584     3.1623     4.472    
-    3         1.26      0.4633     0.455      3.1623     4.472    
-    4         1.75      0.4335     0.4245     3.1623     4.472    
-    5         2.29      0.3985     0.3926     3.1623     4.472    
-    6         2.79      0.3853     0.3806     3.1623     4.472    
-    7         3.32      0.3668     0.3621     3.1623     4.472    
-    8         3.86      0.3575     0.3545     3.1623     4.472    
-    9         4.39      0.3337     0.3295     3.1623     4.472    
-    10        4.93      0.3305     0.3251     3.1623     4.472    
-    11        5.52      0.3112     0.3058     3.1623     4.472    
-    12        6.07      0.3105     0.3044     3.1623     4.472
+# Command
+
+python learning_curve.py -d <real/binary/count> -m <simple/deterministic/robust>
 
 
-why is the covariance change not changing
