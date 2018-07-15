@@ -5,6 +5,10 @@ and see how it performs
 -> Fix a constant number of iterations?
 -> output everything to a file
 
+-> Check problem with generating data?
+
+-> Re-implement main to get better flexibility
+
 
 # Other data types
 - Robust count 3D -> why sigma update results in nan? (really interesting
@@ -29,6 +33,8 @@ in robust model
 
 -> Check simple prediction for binary -> bound is 1/2
 -> Data generation is faulty for binary lmao! no?
+
+why would there be a difference in the way i initialize data?
 
 # Questions: 
 - Complete main.py

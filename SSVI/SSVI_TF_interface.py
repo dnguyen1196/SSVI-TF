@@ -35,7 +35,6 @@ class SSVI_TF(object):
         self.k1     = k1
         self.k2     = k2
         self.batch_size = batch_size
-        self.max_iteration = max_iteration
 
         self.predict_num_samples = 32
 
@@ -83,12 +82,14 @@ class SSVI_TF(object):
         self.d_mean = 1.
         self.d_cov  = 1.
 
-    def factorize(self, report=1000):
+    def factorize(self, report=100, max_iteration=2000):
         self.report = report
+        self.max_iteration = max_iteration
+
         update_column_pointer = [0 for _ in range(self.order)]
         start = time.time()
 
-        for iteration in range(self.max_iteration):
+        for iteration in range(self.max_iteration+1):
             current = time.time()
 
             for dim in range(self.order):
@@ -595,3 +596,9 @@ class SSVI_TF(object):
 
         predict = self.link_fun(fs)
         return np.mean(predict)
+
+    """
+    Reset function
+    """
+    def reset(self):
+        self.posterior.reset()

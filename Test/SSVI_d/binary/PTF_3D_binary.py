@@ -10,8 +10,9 @@ dims        = [20, 20, 20]
 hidden_D    = 20
 means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0]
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
-data        = Tensor(datatype="binary")
 
+
+data        = Tensor(datatype="binary")
 data.synthesize_binary_data(dims, hidden_D, 0.8, 1)
 
 

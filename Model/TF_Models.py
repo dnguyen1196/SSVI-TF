@@ -11,11 +11,11 @@ class Posterior_Full_Covariance(object):
         self.params = [[] for _ in self.dims]
 
         if initMean is None or initCov is None:
-            initMean = np.ones((self.D,))
-            initCov  = np.eye(self.D)
+            self.initMean = np.ones((self.D,))
+            self.initCov  = np.eye(self.D)
 
         for i, s in enumerate(self.dims):
-            self.params[i] = self.initialize_params(s, initMean, initCov)
+            self.params[i] = self.initialize_params(s, self.initMean, self.initCov)
 
     def initialize_params(self, nparams, mean, cov):
         matrices = np.zeros((nparams, self.D + 1, self.D))
@@ -35,3 +35,9 @@ class Posterior_Full_Covariance(object):
 
     def save_mean_params(self, dim, filename):
         np.savetxt(filename, self.params[dim][:, 0, :], delimiter=",")
+
+    def reset(self):
+        self.params = [[] for _ in self.dims]
+
+        for i, s in enumerate(self.dims):
+            self.params[i] = self.initialize_params(s, self.initMean, self.initCov)

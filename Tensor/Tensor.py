@@ -64,6 +64,9 @@ class Tensor(object):
 
         end = time.time()
         print("Generating synthetic ", self.datatype, "valued data took: ", end- start)
+        if self.datatype == "count":
+            print("max_count = ", self.max_count, " min count = ", self.min_count)
+
 
     @abstractmethod
     def generate_hidden_matrices(self, means, covariances):
@@ -278,8 +281,10 @@ class Tensor(object):
     def actual_value(self, m):
         if self.datatype == "real":
             return m
+
         elif self.datatype == "binary":
             return 1 if m >= self.binary_cutoff else -1
+
         elif self.datatype == "count":
             f = self.link_fun(m)
             x = int(np.rint(f))
@@ -287,7 +292,7 @@ class Tensor(object):
             self.min_count = min(self.min_count, x)
             return x
         else:
-            return 0
+            raise NotImplementedError
 
     def find_observed_ui(self, dim, i):
         """

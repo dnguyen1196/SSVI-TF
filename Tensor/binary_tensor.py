@@ -4,8 +4,9 @@ import numpy as np
 
 class binary_tensor(Tensor):
     def __init__(self, binary_cutoff=0.):
-        super(binary_tensor, self).__init__(datatype="binary")
-        self.link_fun = lambda x: probs.sigmoid(x)
+        super(binary_tensor, self).__init__(datatype="binary", binary_cutoff=binary_cutoff)
+
+        # self.link_fun = lambda x: probs.sigmoid(x)
         self.binary_cutoff = binary_cutoff
 
     def generate_hidden_matrices(self, mean=None, cov=None):
@@ -30,7 +31,6 @@ class binary_tensor(Tensor):
             ui = np.multiply(ui, self.matrices[dim][row_num, :])
 
         m = np.sum(ui)
-
         return 1 if m >= self.binary_cutoff else -1
 
     def actual_value(self, m):
