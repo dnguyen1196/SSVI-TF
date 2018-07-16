@@ -1,4 +1,5 @@
 #!/bin/bash
+module load python/3.5.0
 
 opts="-p batch -c 8 --mem=10000 --time=10:00:00 --mail-type=ALL --mail-user=$USER"
 
