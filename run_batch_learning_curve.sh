@@ -11,7 +11,7 @@ opts="-p batch -c 8 --mem=10000 --time=10:00:00 --mail-type=ALL --mail-user=$USE
 
 while IFS=' ' read -r data model
 do
-    outs = "--output=$data-$model.out --error=$data-$model.err "
+    outs="--output=$data-$model.out --error=$data-$model.err "
     sbatch $opts $outs --wrap='python learning_curve.py -d $data -m $model'
 #    echo "sbatch $opts $outs --wrap='python learning_curve.py -d $data -m $model'"
     sleep 1
