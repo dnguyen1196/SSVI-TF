@@ -1,13 +1,8 @@
 # Testing
-- Implement function to perform learning curve investigation
--> 0.8 data train data, 0.2 test -> then use 20%, 40%, ..., 100% of training data
-and see how it performs 
--> Fix a constant number of iterations?
--> output everything to a file
-
--> Check problem with generating data?
-
--> Re-implement main to get better flexibility
+- noise at 100? is this too much
+- Look at implementation and see where I could do some speed up, 
+in terms of order of computation
+- diagonal covariance?
 
 
 # Other data types

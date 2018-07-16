@@ -1,8 +1,9 @@
 #!/bin/bash
 module load python/3.5.0
 
-opts="-p batch -c 1 --mem=4000 --time=10:00:00 --mail-type=ALL --mail-user=$USER"
+opts="-p batch -c 1 --mem=4000 --time=1-12:00:00 --mail-type=ALL --mail-user=$USER"
 outdir="/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/"
+
 #while read filenm; do
 #      outs = "--output=$filenm.out --error=$filenm.err "
 #      echo "sbatch $opts $outs --wrap='learning_curve.py -d $ -m $'"
