@@ -12,7 +12,6 @@ outdir="/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/"
 while IFS=' ' read -r data model
 do
     outs="--output=$outdir$data-$model.out --error=$outdir$data-$model.err "
-    sbatch $opts $outs --wrap='python learning_curve.py -d $data -m $model'
-#    echo "sbatch $opts $outs --wrap='python learning_curve.py -d $data -m $model'"
+    sbatch $opts $outs --wrap="python learning_curve.py -d $data -m $model"
     sleep 1
 done
