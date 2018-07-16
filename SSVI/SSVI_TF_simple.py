@@ -4,16 +4,11 @@ import numpy as np
 from numpy.linalg import inv
 
 class SSVI_TF_simple(SSVI_TF):
-    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
+    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", diag=False, \
                  mean0=None, cov0=None, sigma0=1,k1=20, k2=10, batch_size=100):
 
-        super(SSVI_TF_simple, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
+        super(SSVI_TF_simple, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
                  mean0, cov0, sigma0,k1, k2, batch_size)
-
-        self.pmu             = np.ones((self.D,))
-        self.pSigma          = np.ones((len(self.dims),))
-        self.pSigma_inv      = np.eye(self.D)
-        self.posterior       = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0)
 
         self.w_tau = 1.
         self.w_sigma = 1.

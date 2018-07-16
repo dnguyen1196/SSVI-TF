@@ -33,4 +33,4 @@ factorizer  = SSVI_TF_robust(data, rank=D, \
                             mean0=mean0, cov0=cov0, k1=128, k2=64, \
                             eta=1, cov_eta=0.1)
 
-factorizer.factorize(report=50)
+factorizer.factorize(report=10)

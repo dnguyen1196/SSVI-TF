@@ -3,21 +3,15 @@ from Model.TF_Models import Posterior_Full_Covariance
 import numpy as np
 from numpy.linalg import inv, norm, eig, eigh
 
-
 class SSVI_TF_robust(SSVI_TF):
-    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
+    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", diag=False, \
                  mean0=None, cov0=None,\
                  sigma0=1,k1=50, k2=50, batch_size=128, \
                  eta=1, cov_eta=1, sigma_eta=1):
 
-        super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, \
+        super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
                  mean0, cov0, \
                  sigma0,k1, k2, batch_size, eta, cov_eta, sigma_eta)
-
-        self.pmu             = np.ones((self.D,))
-        self.pSigma          = np.ones((len(self.dims),))
-        self.pSigma_inv      = np.eye(self.D)
-        self.posterior       = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0)
 
         self.w_tau = 1.
         self.w_sigma = 1.
@@ -39,16 +33,12 @@ class SSVI_TF_robust(SSVI_TF):
         # Shape of vjs_batch would be (num_subsamples, k1, D)
         # Note that the formulation for fully robust model requires sampling for all
         # component vectors
-
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
-        # print("vjs ", vjs_batch.shape)
 
         # uis_batch.shape = (num_samples, k1, D)
-        # TODO: check dimensionality!!
         uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
 
-        assert(uis_batch.shape == vjs_batch.shape)
-
+        # assert(uis_batch.shape == vjs_batch.shape)           # sanity check
         # assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
         # assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
 
@@ -56,7 +46,7 @@ class SSVI_TF_robust(SSVI_TF):
 
         # mean_batch.shape = (num_samples, k1)
         mean_batch = np.sum(np.multiply(vjs_batch, uis_batch), axis=2)
-        assert(mean_batch.shape == (num_subsamples, self.k1))
+        # assert (mean_batch.shape == (num_subsamples, self.k1)) # sanity check
 
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(ys, mean_batch, vjs_batch, ws_batch)
 
@@ -64,7 +54,6 @@ class SSVI_TF_robust(SSVI_TF):
 
     def approximate_di_Di_si_with_second_layer_samplings(self, ys, mean_batch, vjs_batch, ws_batch):
         """
-
         :param ys:          (num_samples,)
         :param mean_batch:  (num_samples, k1)
         :param vjs_batch:   (num_samples, k1, D)
@@ -77,16 +66,12 @@ class SSVI_TF_robust(SSVI_TF):
         # All shapes are (num_samples, k1)
         phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
 
-        # print("phi_prime/phi: ", phi_fst/ phi)
-        # print("phi_snd/phi: ", phi_snd/ phi)
-
         di = np.zeros((num_samples, self.D))
         Di = np.zeros((num_samples, self.D, self.D))
         si = np.zeros((num_samples,))
 
         for num in range(num_samples):
-            # print("sigma = ", self.w_sigma)
-            # p.shape = (k1,)
+            # p.shape == p1.shape == p2.shape == (k1,)
             p = phi[num, :]
             p1 = phi_fst[num, :]
             p2 = phi_snd[num, :]
@@ -94,20 +79,10 @@ class SSVI_TF_robust(SSVI_TF):
             v  = vjs_batch[num, :, :] # v.shape = (k1, D)
             w  = ws_batch[num, :]     # w.shape = (k1,)
 
-            # print("nan: ", np.any(np.isnan(p2/p)))
-            # print("p2/ p ", np.any(p == 0))
-            # print("zro: ", np.any(p2/p == 0))
-            #
-            # if norm(np.square(p2)/p1) > 1:
-            #     print("num: ", num)
-            #     print("ys[num] ", ys[num])
-            #     print("mean_batch ", mean_batch)
-
             di[num, :] = np.mean(np.transpose(np.multiply(np.transpose(v), \
                                                              1/p * p1)), axis=0)
 
             si[num]    = np.mean(w * p2 / p) / (8*np.square(self.w_sigma))
-            # print("si[num] ", si[num])
 
             for k in range(self.k1):
                 pre = 0.5 / np.multiply(self.k1, p[k])
@@ -121,10 +96,6 @@ class SSVI_TF_robust(SSVI_TF):
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
         si = np.sum(si)
-
-        # print("di: ", np.linalg.norm(di))
-        # print("Di: ", np.linalg.norm(Di, "fro"))
-        # print("si: ", si)
 
         return di, Di, si
 
@@ -155,46 +126,6 @@ class SSVI_TF_robust(SSVI_TF):
     # TODO: implement closed form version if exists
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
-
-    # def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
-    #     if self.cov_update == "S":
-    #         L = cholesky(S)
-    #         covGrad = self.remove_negative_eigenvals(\
-    #                   np.triu(inv(np.multiply(L, np.eye(self.D))) \
-    #                   - np.inner(L, self.pSigma_inv) + 2 * np.dot(L, Di_acc)))
-    #
-    #         covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-    #         L_next  = L + covStep * covGrad
-    #         S_next  = np.dot(L, np.transpose(L))
-    #
-    #     elif self.cov_update == "N":
-    #         covGrad = self.remove_negative_eigenvals(self.pSigma_inv - 2 * Di_acc)
-    #         covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
-    #         S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
-    #
-    #     else:
-    #         raise Exception("Unidentified update formula for covariance param")
-    #     return S_next
-    #
-    # def remove_negative_eigenvals(self, covGrad):
-    #     return covGrad
-    #
-    #     eigvals, eigvec = eig(covGrad)
-    #     eigvals    = np.maximum(np.real(eigvals), 0.)
-    #     # w_pos  = np.minimum(np.real(w), 0.)
-    #
-    #     eigvals    = self.scale_eigenvals(eigvals)
-    #     # print("ev: ", eigvals)
-    #     eigvec     = np.real(eigvec)
-    #     w_pos_vt   = np.multiply(np.transpose(eigvec), eigvals[:, np.newaxis])
-    #
-    #     # w_pos_vt = np.dot(np.diag(w), np.transpose(v))
-    #     # print(norm(w_pos_vt))
-    #     return np.dot(eigvec, w_pos_vt)
-    #
-    # def scale_eigenvals(self, eigvals):
-    #     # return eigvals/norm(eigvals)
-    #     return eigvals
 
     def predict_entry(self, entry):
         if self.likelihood_type == "normal":

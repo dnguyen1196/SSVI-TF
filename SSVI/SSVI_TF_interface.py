@@ -5,7 +5,7 @@ import numpy as np
 from numpy.linalg import inv
 from numpy.linalg import norm
 from numpy.linalg import cholesky
-from Model.TF_Models import Posterior_Full_Covariance
+from Model.TF_Models import Posterior_Full_Covariance, Posterior_Diag_Covariance
 
 from Probability.normal import NormalDistribution
 from Probability.bernoulli import BernoulliDistribution
@@ -16,8 +16,10 @@ import time
 
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                        mean0=None, cov0=None, sigma0=1,k1=64, k2=64, batch_size=128, \
-                        eta=1, cov_eta=1, sigma_eta=1, max_iteration=2000):
+                        diag=False,
+                        mean0=None, cov0=None, sigma0=1,\
+                        k1=64, k2=64, batch_size=128, eta=1, cov_eta=1, sigma_eta=1, \
+                        max_iteration=2000):
 
         self.tensor = tensor
         self.dims   = tensor.dims
@@ -28,6 +30,13 @@ class SSVI_TF(object):
         self.mean_update = mean_update
         self.cov_update  = cov_update
         self.noise_update = noise_update
+
+        self.diag = diag
+        if not diag:
+            self.posterior        = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0)
+        else:
+            self.posterior        = Posterior_Diag_Covariance(self.dims, self.D, mean0, cov0)
+            self.ada_acc_grad_cov = [np.zeros((self.D, s)) for s in self.dims]
 
         self.mean0  = mean0
         self.cov0   = cov0
@@ -66,8 +75,6 @@ class SSVI_TF(object):
         self.epsilon = 0.0001
 
         # Optimization parameter
-        # self.scheme = scheme
-        # if scheme == "adagrad":
         self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
 
         self.eta = eta
@@ -127,7 +134,10 @@ class SSVI_TF(object):
         M = self.dims[dim]
         for j in range(M):
             m, S = self.posterior.get_vector_distribution(dim, j)
-            sigma += np.trace(S) + np.dot(m, m)
+            if self.diag:
+                sigma += np.sum(S) + np.dot(m, m)
+            else:
+                sigma += np.trace(S) + np.dot(m, m)
 
         self.pSigma[dim] = sigma/(M*self.D)
 
@@ -154,8 +164,12 @@ class SSVI_TF(object):
         di *= scale
 
         # Compute next covariance and mean
-        S_next   = self.update_cov_param(dim, i, m, S, di, Di)
-        m_next   = self.update_mean_param(dim, i, m, S, di, Di)
+        if self.diag:
+            S_next   = self.update_cov_param_diag(dim, i, m, S, di, Di)
+            m_next   = self.update_mean_param_diag(dim, i, m, S, di, Di)
+        else:
+            S_next   = self.update_cov_param(dim, i, m, S, di, Di)
+            m_next   = self.update_mean_param(dim, i, m, S, di, Di)
 
         if self.noise_added:
             w_sigma        = self.update_sigma_param(si, scale)
@@ -170,6 +184,19 @@ class SSVI_TF(object):
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
+        """
+
+        :param dim:
+        :param i:
+        :param coords:
+        :param ys:
+        :param m:
+        :param S:
+        :return:
+
+        Note that robust model will have a completely different implementation of this
+        function
+        """
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
 
         othercols_left     = coords[:, : dim]
@@ -190,13 +217,13 @@ class SSVI_TF(object):
             ws_batch   = None
 
         mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
-        cov_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
+        var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
 
         for num in range(num_subsamples):
             vs = vjs_batch[num, :, :] # shape (k1, D)
-            cov_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
+            var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
 
-        di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, cov_batch, ws_batch)
+        di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
 
         return di, Di, si
 
@@ -209,13 +236,17 @@ class SSVI_TF(object):
         raise NotImplementedError
 
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
+        sigma = self.pSigma[dim]
+        pSigma_inv = np.diag(np.full((self.D,), 1/sigma))
+
         if self.mean_update == "S":
-            meanGrad = (np.inner(self.pSigma_inv, self.pmu - m) + di_acc)
+            meanGrad = (np.inner(pSigma_inv, self.pmu - m) + di_acc)
             meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
             m_next = m + np.multiply(meanStep, meanGrad)
+
         elif self.mean_update == "N":
             C = np.inner(inv(S), m)
-            meanGrad = np.inner(self.pSigma_inv, self.pmu) + di_acc - 2 * np.inner(Di_acc, m)
+            meanGrad = np.inner(pSigma_inv, self.pmu) + di_acc - 2 * np.inner(Di_acc, m)
             meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
             C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
             m_next   = np.inner(S, C_next)
@@ -224,17 +255,20 @@ class SSVI_TF(object):
         return m_next
 
     def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
+        sigma = self.pSigma[dim]
+        pSigma_inv = np.diag(np.full((self.D,), 1/sigma))
+
         if self.cov_update == "S":
             L = cholesky(S)
             covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
-                      - np.inner(L, self.pSigma_inv) + 2 * np.dot(L, Di_acc))
+                      - np.inner(L, pSigma_inv) + 2 * np.dot(L, Di_acc))
 
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
             L_next  = L + covStep * covGrad
             S_next  = np.dot(L, np.transpose(L))
 
         elif self.cov_update == "N":
-            covGrad = (self.pSigma_inv - 2 * Di_acc)
+            covGrad = (pSigma_inv - 2 * Di_acc)
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
             S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
 
@@ -242,23 +276,57 @@ class SSVI_TF(object):
             raise Exception("Unidentified update formula for covariance param")
         return S_next
 
+    def update_mean_param_diag(self, dim, i, m, S, di_acc, Di_acc):
+        sigma = self.pSigma[dim]
+        pSigma_inv = np.full((self.D,), 1/sigma)
+
+        if self.mean_update == "S":
+            meanGrad = np.multiply(pSigma_inv, self.pmu - m) + di_acc
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            m_next = m + np.multiply(meanStep, meanGrad)
+
+        elif self.mean_update == "N":
+            C = np.multiply(np.reciprocal(S), m)
+            meanGrad = np.multiply(pSigma_inv, self.pmu) + di_acc - 2 * np.multiply(Di_acc, m)
+            meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
+            C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
+            m_next   = np.multiply(S, C_next) # S S^(-1) m
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return m_next
+
+    def update_cov_param_diag(self, dim, i, m, S, di_acc,  Di_acc):
+        sigma = self.pSigma[dim]
+        pSigma_inv = np.full((self.D,), 1/sigma)
+
+        if self.cov_update == "S":
+            L = np.sqrt(S)
+            # covGrad.shape = (D,)
+            covGrad = np.reciprocal(L) - np.multiply(L, pSigma_inv) + 2 * np.multiply(L, Di_acc)
+
+            covStep = self.compute_step_size_cov_param_diag(dim, i, covGrad)
+            L_next  = L + covStep * covGrad
+            S_next  = np.square(L)
+
+        elif self.cov_update == "N":
+            covGrad = pSigma_inv - 2 * Di_acc
+            covStep = self.compute_step_size_cov_param_diag(dim, i, covGrad)
+            S_next = np.reciprocal((1 - covStep) * np.reciprocal(S) + np.multiply(covStep, covGrad))
+
+        else:
+            raise Exception("Unidentified update formula for covariance param")
+        return S_next
+
     def update_sigma_param(self, si_acc, scale):
-        # print(si_acc)
-        # print("scale: ", scale)
         si_acc *= scale
         w_grad = -1/(2 * np.square(self.w_tau)) + si_acc
         w_step = self.compute_stepsize_sigma_param(w_grad)
-        # print("w_step: ", w_step)
 
         update = (1-w_step) * (-0.5/np.square(self.w_sigma)) + w_step * w_grad
-        # print("update: ", update)
         next_sigma = np.sqrt(-0.5/update)
         return next_sigma
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
-        # if self.scheme == "sgd":
-        #     return self.eta/ (self.time_step[dim] + 1)
-
         acc_grad = self.ada_acc_grad[dim][:, i]
         grad_sqr = np.square(mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
@@ -275,6 +343,16 @@ class SSVI_TF(object):
 
         return self.cov_eta/(self.time_step[dim] + 1)
 
+    def compute_step_size_cov_param_diag(self, dim, i, covGrad):
+        acc_grad = self.ada_acc_grad_cov[dim][:, i]
+        grad_sqr = np.square(covGrad)
+        self.ada_acc_grad_cov[dim][:, i] += grad_sqr
+
+        if self.likelihood_type != "poisson":
+            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        else:
+            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+
     def compute_stepsize_sigma_param(self, w_grad):
         self.w_ada_grad += np.square(w_grad)
 
@@ -283,6 +361,7 @@ class SSVI_TF(object):
 
     def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
         mean_change = np.linalg.norm(m_next - m)
+        # Check for dimensionality of covariance
         if S.ndim != 1:
             cov_change  = np.linalg.norm(S_next - S, 'fro')
         else:
@@ -448,8 +527,8 @@ class SSVI_TF(object):
     #         res   = self.compute_expected_count_quadrature(m, S)
     #         return np.rint(res)
 
-    # Test version
     def predict_entry(self, entry):
+        # real value data for all models
         if self.likelihood_type == "normal":
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):
@@ -457,22 +536,19 @@ class SSVI_TF(object):
                 u = np.multiply(u, m)
             return np.sum(u)
 
+        # deterministic binary
         elif self.likelihood_type == "bernoulli" and not self.noise_added:
             u = np.ones((self.D,))
             for dim, col in enumerate(entry):
                 m, _ = self.posterior.get_vector_distribution(dim, col)
                 u = np.multiply(u, m)
-
             return 1 if np.sum(u) > 0 else -1
-
+        # For other cases, do samplings to estimate
         else:
             res = self.estimate_expected_observation_sampling(entry)
             if self.likelihood_type == "bernoulli":
-                # return res
                 return 1 if res > 1/2 else -1
-
             elif self.likelihood_type == "poisson":
-                # return np.rint(res)
                 return res
     """
     Bridge function
@@ -549,7 +625,6 @@ class SSVI_TF(object):
             sum_probs += probs[i]
 
         return np.sum(np.multiply(probs, np.array(k_array)))/sum_probs
-
 
     """
     Functions to do prediction via samplings

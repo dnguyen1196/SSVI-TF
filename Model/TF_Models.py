@@ -1,7 +1,8 @@
 import numpy as np
+from abc import abstractclassmethod, abstractmethod
 
 
-class Posterior_Full_Covariance(object):
+class Posterior(object):
     def __init__(self, dims, D, initMean=None, initCov=None):
         self.dims = dims
         self.D    = D
@@ -17,27 +18,60 @@ class Posterior_Full_Covariance(object):
         for i, s in enumerate(self.dims):
             self.params[i] = self.initialize_params(s, self.initMean, self.initCov)
 
+    @abstractmethod
     def initialize_params(self, nparams, mean, cov):
-        matrices = np.zeros((nparams, self.D + 1, self.D))
+        raise NotImplementedError
 
-        for i in range(nparams):
-            matrices[i, 0, :]   = np.copy(mean)
-            matrices[i, 1 :, :] = np.copy(cov)
-
-        return matrices
-
+    @abstractmethod
     def get_vector_distribution(self, dim, i):
-        return self.params[dim][i, 0, :], self.params[dim][i, 1 : , :]
+        raise NotImplementedError
 
-    def update_vector_distribution(self, dim, i, m, S):
-        self.params[dim][i, 0, :] = m
-        self.params[dim][i, 1:, :] = S
+    @abstractmethod
+    def update_vector_distribution(self, dim, i, m_next, S_next):
+        raise NotImplementedError
 
     def save_mean_params(self, dim, filename):
         np.savetxt(filename, self.params[dim][:, 0, :], delimiter=",")
 
     def reset(self):
         self.params = [[] for _ in self.dims]
-
         for i, s in enumerate(self.dims):
             self.params[i] = self.initialize_params(s, self.initMean, self.initCov)
+
+
+class Posterior_Full_Covariance(Posterior):
+    def __init__(self, dims, D, initMean=None, initCov=None):
+        super(Posterior_Full_Covariance, self).__init__(dims, D, initMean, initCov)
+
+    def initialize_params(self, nparams, mean, cov):
+        matrices = np.zeros((nparams, self.D + 1, self.D))
+        for i in range(nparams):
+            matrices[i, 0, :]   = np.copy(mean)
+            matrices[i, 1 :, :] = np.copy(cov)
+        return matrices
+
+    def get_vector_distribution(self, dim, i):
+        return self.params[dim][i, 0, :], self.params[dim][i, 1 : , :]
+
+    def update_vector_distribution(self, dim, i, m_next, S_next):
+        self.params[dim][i, 0, :] = m_next
+        self.params[dim][i, 1 : , :] = S_next
+
+
+class Posterior_Diag_Covariance(Posterior):
+    def __init__(self, dims, D, initMean=None, initCov=None):
+        super(Posterior_Diag_Covariance, self).__init__(dims, D, initMean, initCov)
+
+    def initialize_params(self, nparams, mean, cov):
+        matrices = np.zeros((nparams, 2, self.D))
+        for i in range(nparams):
+            matrices[i, 0, :]  = np.copy(mean)
+            matrices[i, 1, :]  = np.copy(np.diag(cov))
+        return matrices
+
+    def get_vector_distribution(self, dim, i):
+        return self.params[dim][i, 0, :], self.params[dim][i, 1, :]
+
+    def update_vector_distribution(self, dim, i, m_next, S_next):
+        self.params[dim][i, 0, :] = m_next
+        self.params[dim][i, 1, :] = S_next
