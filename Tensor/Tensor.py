@@ -54,7 +54,7 @@ class Tensor(object):
 
         self.observed_entries = self.generate_unique_coords(observed_num)
         self.observed_vals    \
-            = self.organize_observed_entries_by_column(self.observed_entries, train_size, noise)
+            = self.organize_observed_entries_by_column(self.observed_entries, train_size)
 
         self.test_entries  = self.observed_entries[train_size :]
         self.test_vals     = self.observed_vals[train_size :]
@@ -92,8 +92,7 @@ class Tensor(object):
             for dim, row_num in enumerate(entry):
                 self.observed_by_id[dim][row_num].append((entry, f))
 
-    def organize_observed_entries_by_column(self, observed_coords, train_size, noise):
-        self.noise = noise
+    def organize_observed_entries_by_column(self, observed_coords, train_size):
         ndim = len(self.dims)
         observed_vals = [0] * len(observed_coords)
         self.observed_by_id = [[] for _ in range(ndim)]
