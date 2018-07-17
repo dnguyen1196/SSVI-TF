@@ -12,7 +12,7 @@ echo "Using diagonal covariance? $diag"
 while IFS=' ' read -r data model
 do
     outs="--output=$outdir$data-$model.out --error=$outdir$data-$model.err "
-    if ["$diag"=="true"]
+    if [ "$diag" == "true" ]
     then
         sbatch $opts $outs --wrap="python learning_curve.py -d $data -m $model --diag"
     else
