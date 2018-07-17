@@ -6,8 +6,8 @@ opts="-p batch -c 1 --mem=4000 --time=1-12:00:00 --mail-type=ALL --mail-user=$US
 read outdir # output directory
 read diag   # diagonal formulation
 
-echo"Output directory: $outdir"
-echo"Using diagonal covariance? $diag"
+echo "Output directory: $outdir"
+echo "Using diagonal covariance? $diag"
 
 while IFS=' ' read -r data model
 do
