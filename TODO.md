@@ -1,19 +1,13 @@
 # Testing
-- noise at 100? is this too much? try with different noise level
+- noise at 100? is this too much? try with different noise level?
 - Look at implementation and see where I could do some speed up, 
 in terms of order of computation
-- Shit forgot to set random seed T.T
-- diagonal covariance -> use adagrad as well?
 
 # diagonal covariance
-- first modify the interface
-- How am I updating the hyperparameter?
-- 
-- make sure that everything still works
 
 
 # Testing real data
-
+- report RSME instead!
 
 # Other data types
 - Robust count 3D -> why sigma update results in nan? (really interesting

@@ -11,6 +11,7 @@ from SSVI.SSVI_TF_robust import SSVI_TF_robust
 from SSVI.SSVI_TF_d import SSVI_TF_d
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 
+np.random.seed(seed=319)
 
 def do_learning_curve(factorizer, tensor):
     train_curve = [0.2, 0.4, 0.6, 0.8, 1]

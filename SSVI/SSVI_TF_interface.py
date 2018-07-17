@@ -403,7 +403,7 @@ class SSVI_TF(object):
             print("Covariance update : ", self.cov_update)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
-            print("iteration |   time   | test_err | train_err|  d_mean  |   d_cov  |", end=" ")
+            print("iteration |   time   |test_rsme |train_rsme|  d_mean  |   d_cov  |", end=" ")
             if self.likelihood_type == "poisson":
                 print("test_nll | train_nll ", end=" ")
 
@@ -478,10 +478,15 @@ class SSVI_TF(object):
         return d_mean, d_cov
 
     def evaluate_train_error(self):
-        return self.evaluate_error(self.tensor.train_entries, self.tensor.train_vals)
+        # error = self.evaluate_error(self.tensor.train_entries, self.tensor.train_vals)
+        error = self.evaluate_RSME(self.tensor.train_entries, self.tensor.train_vals)
+        return error
+
 
     def evaluate_test_error(self):
-        return self.evaluate_error(self.tensor.test_entries, self.tensor.test_vals)
+        # error = self.evaluate_error(self.tensor.test_entries, self.tensor.test_vals)
+        error = self.evaluate_RSME(self.tensor.test_entries, self.tensor.test_vals)
+        return error
 
     def evaluate_error(self, entries, vals):
         """
@@ -491,14 +496,11 @@ class SSVI_TF(object):
         for i in range(len(entries)):
             predict = self.predict_entry(entries[i])
             correct = vals[i]
-            # print(predict, " vs ", correct)
-
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
 
             elif self.likelihood_type == "bernoulli":
                 error += 1 if predict != correct else 0
-                # error += np.abs(predict - correct)/abs(correct)
 
             elif self.likelihood_type == "poisson":
                 error += np.abs(predict - correct)
@@ -507,25 +509,21 @@ class SSVI_TF(object):
 
         return error/len(entries)
 
+    def evaluate_RSME(self, entries, vals):
+        error = 0.0
+
+        for i in range(len(entries)):
+            predict = self.predict_entry(entries[i])
+            correct = vals[i]
+            error += np.square(predict - correct)
+
+        rsme = np.sqrt(error/len(vals))
+
+        return rsme
+
     """
     Predict entry function
     """
-    # Working version
-    # def predict_entry(self, entry):
-    #     # If not count-valued tensor
-    #     if self.likelihood_type != "poisson":
-    #         u = np.ones((self.D,))
-    #         for dim, col in enumerate(entry):
-    #             m, _ = self.posterior.get_vector_distribution(dim, col)
-    #             u = np.multiply(u, m)
-    #         m = np.sum(u)
-    #         return self.predict_y_given_m(m)
-    #     else:
-    #         # if predicting count values, need to do estimation
-    #         # res = self.compute_expected_count_sampling(entry)
-    #         m, S  = self.compute_posterior_param(entry)
-    #         res   = self.compute_expected_count_quadrature(m, S)
-    #         return np.rint(res)
 
     def predict_entry(self, entry):
         # real value data for all models
