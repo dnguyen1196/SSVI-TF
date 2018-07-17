@@ -32,10 +32,12 @@ class SSVI_TF_simple(SSVI_TF):
         fst_deriv_batch, snd_deriv_batch, si = \
             self.estimate_expected_derivative_batch(ys, mean_batch, cov_batch, ws_batch)
 
-        # print("si = ", si)
-
         di = np.zeros((self.D,))
-        Di = np.zeros((self.D,self.D))
+
+        if self.diag:
+            Di = np.zeros((self.D,))
+        else:
+            Di = np.zeros((self.D,self.D))
 
         for num in range(num_samples):
             # Compute vj * scale
@@ -45,7 +47,10 @@ class SSVI_TF_simple(SSVI_TF):
 
             for k1 in range(self.k1):
                 vj = vjs_batch[num, k1, :]
-                Di += 1/2 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
+                if self.diag:
+                    Di += 0.5 * np.multiply(vj, vj) * snd_deriv_batch[num, k1] / self.k1
+                else:
+                    Di += 0.5 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
 
         return di, Di, si
 

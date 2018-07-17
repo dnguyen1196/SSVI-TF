@@ -21,7 +21,11 @@ def do_learning_curve(factorizer, tensor):
         factorizer.factorize(report=50, max_iteration=2000)
 
 
-def test_learning_curve(datatype, model):
+def test_learning_curve(datatype, model, diag):
+    diag_cov = False
+    if diag:
+        diag_cov = True
+
     assert (datatype in ["real", "binary", "count"])
     assert (model in ["deterministic", "simple", "robust"])
 
@@ -58,33 +62,35 @@ def test_learning_curve(datatype, model):
 
     if model == "deterministic":
         factorizer = SSVI_TF_d(tensor, rank=fact_D, \
-                               mean_update=mean_update, cov_update=cov_update, \
+                               mean_update=mean_update, cov_update=cov_update, diag=diag_cov,\
                                k1=64, k2=64, \
                                mean0=mean0, cov0=cov0)
     elif model == "simple":
         factorizer = SSVI_TF_simple(tensor, rank=fact_D, \
-                               mean_update=mean_update, cov_update=cov_update, \
+                               mean_update=mean_update, cov_update=cov_update, diag=diag_cov, \
                                k1=64, k2=64, \
                                mean0=mean0, cov0=cov0)
 
     elif model == "robust":
         factorizer = SSVI_TF_robust(tensor, rank=fact_D, \
-                                    mean_update=mean_update, cov_update=cov_update, \
-                                    mean0=mean0, cov0=cov0, k1=64, k2=64, \
-                                    eta=eta, cov_eta=cov_eta)
+                                mean_update=mean_update, cov_update=cov_update, diag=diag_cov, \
+                                mean0=mean0, cov0=cov0, k1=64, k2=64, \
+                                eta=eta, cov_eta=cov_eta)
 
     do_learning_curve(factorizer, tensor)
 
 parser = argparse.ArgumentParser(description='3D tensor factorization synthetic data')
 parser.add_argument("-d", "--data", type=str, help="data types: binary, real or count")
 parser.add_argument("-m", "--model", type=str, help="model: simple, deterministic or robust")
+parser.add_argument("--diag", action="store_true")
 
 args = parser.parse_args()
 
 datatype = args.data
 model    = args.model
+diag     = args.diag
 
 assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
 
-test_learning_curve(datatype, model)
+test_learning_curve(datatype, model, diag)

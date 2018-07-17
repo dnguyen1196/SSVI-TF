@@ -658,7 +658,10 @@ class SSVI_TF(object):
 
         for dim, i in enumerate(entry):
             m, S = self.posterior.get_vector_distribution(dim, i)
-            samples = np.random.multivariate_normal(m, S, size=(self.predict_num_samples))
+            if self.diag:
+                samples = np.random.multivariate_normal(m, np.diag(S), size=(self.predict_num_samples))
+            else:
+                samples = np.random.multivariate_normal(m, S, size=(self.predict_num_samples))
             ms = ms * samples
 
         ms = np.sum(ms, axis=1) # fs.shape == (self.predict_num_samples, )

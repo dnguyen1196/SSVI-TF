@@ -36,7 +36,10 @@ class SSVI_TF_robust(SSVI_TF):
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
 
         # uis_batch.shape = (num_samples, k1, D)
-        uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
+        if self.diag:
+            uis_batch = np.random.multivariate_normal(m, np.diag(S), size=(num_subsamples,self.k1))
+        else:
+            uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
 
         # assert(uis_batch.shape == vjs_batch.shape)           # sanity check
         # assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
@@ -67,7 +70,10 @@ class SSVI_TF_robust(SSVI_TF):
         phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
 
         di = np.zeros((num_samples, self.D))
-        Di = np.zeros((num_samples, self.D, self.D))
+        if self.diag:
+            Di = np.zeros((num_samples, self.D))
+        else:
+            Di = np.zeros((num_samples, self.D, self.D))
         si = np.zeros((num_samples,))
 
         for num in range(num_samples):
@@ -85,13 +91,24 @@ class SSVI_TF_robust(SSVI_TF):
             si[num]    = np.mean(w * p2 / p) / (8*np.square(self.w_sigma))
 
             for k in range(self.k1):
-                pre = 0.5 / np.multiply(self.k1, p[k])
-                temp1 = np.multiply(np.outer(v[k, :], v[k, :]), p2[k])
 
-                v_phi = np.multiply(v[k, :], p2[k])
-                temp2 = np.multiply(1/p[k], np.outer(v_phi, v_phi))
+                if self.diag:
+                    pre = 0.5 / np.multiply(self.k1, p[k])
+                    temp1 = np.multiply(np.multiply(v[k, :], v[k, :]), p2[k])
 
-                Di[num, :, :] += np.multiply(pre, np.subtract(temp1, temp2))
+                    v_phi = np.multiply(v[k, :], p2[k])
+                    temp2 = np.multiply(1/p[k], np.multiply(v_phi, v_phi))
+
+                    Di[num, :] += np.multiply(pre, np.subtract(temp1, temp2))
+
+                else:
+                    pre = 0.5 / np.multiply(self.k1, p[k])
+                    temp1 = np.multiply(np.outer(v[k, :], v[k, :]), p2[k])
+
+                    v_phi = np.multiply(v[k, :], p2[k])
+                    temp2 = np.multiply(1/p[k], np.outer(v_phi, v_phi))
+
+                    Di[num, :, :] += np.multiply(pre, np.subtract(temp1, temp2))
 
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
