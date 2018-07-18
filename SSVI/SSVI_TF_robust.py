@@ -169,6 +169,7 @@ class SSVI_TF_robust(SSVI_TF):
 
         update = (1-w_step) * (-0.5/np.square(self.w_sigma)) + w_step * w_grad
         # print("update: ", update)
+
         next_sigma = np.sqrt(-0.5/update)
 
         if np.isnan(next_sigma):

@@ -29,9 +29,10 @@ cov0 = np.eye(D)
 ############################### FACTORIZATION ##########################
 mean_update = "S"
 cov_update  = "N"
+diag        = True
 
 factorizer = SSVI_TF_d(data, rank=D, \
-                            mean_update=mean_update, cov_update=cov_update, \
+                            mean_update=mean_update, cov_update=cov_update, diag=diag,\
                             k1=64, k2=64,\
                             mean0=mean0, cov0=cov0)
 

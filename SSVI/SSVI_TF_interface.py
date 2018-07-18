@@ -208,9 +208,12 @@ class SSVI_TF(object):
         otherdims.extend(alldims[dim + 1 : ])
 
         # Shape of vjs_batch would be (num_subsamples, k1, D)
+        # Sample vj, tk, ...
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
 
         assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+
+        # Sample rayleigh noise
         if self.noise_added:
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
         else:
@@ -221,7 +224,10 @@ class SSVI_TF(object):
 
         for num in range(num_subsamples):
             vs = vjs_batch[num, :, :] # shape (k1, D)
-            var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
+            if self.diag:
+                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(np.diag(S), vs)), axis=0)
+            else:
+                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
 
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
 

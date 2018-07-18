@@ -2,12 +2,14 @@
 - noise at 100? is this too much? try with different noise level?
 - Look at implementation and see where I could do some speed up, 
 in terms of order of computation
+- 
 
 # diagonal covariance
-
+- the scale becomes < 0 (cov_batch contains negative values? wy)
+- Line 222 of interface -> what is it doing
 
 # Testing real data
-- report RSME instead!
+ 
 
 # Other data types
 - Robust count 3D -> why sigma update results in nan? (really interesting
