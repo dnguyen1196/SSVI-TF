@@ -2,6 +2,7 @@ import numpy as np
 
 from SSVI.SSVI_TF_d import SSVI_TF_d
 from Tensor.Tensor import Tensor
+from Tensor.binary_tensor import binary_tensor
 
 np.random.seed(seed=317) # For control and comparisons
 
@@ -12,8 +13,8 @@ means       = [np.ones((hidden_D,)) * 0, np.ones((hidden_D,)) * 0, np.ones((hidd
 covariances = [np.eye(hidden_D)*0.1, np.eye(hidden_D), np.eye(hidden_D)*0.5]
 
 
-data        = Tensor(datatype="binary")
-data.synthesize_binary_data(dims, hidden_D, 0.8, 1)
+data        = binary_tensor()
+data.synthesize_data(dims, means=None, covariances=None, D=hidden_D, train=0.8, sparsity=1, noise=0.1)
 
 
 ################## MODEL and FACTORIZATION #########################

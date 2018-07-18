@@ -1,8 +1,9 @@
 # Testing
 - noise at 100? is this too much? try with different noise level?
+- might have to increase number of iterations :|
 - Look at implementation and see where I could do some speed up, 
 in terms of order of computation
-- 
+- add noise in terms of percentage
 
 # diagonal covariance
 - the scale becomes < 0 (cov_batch contains negative values? wy)

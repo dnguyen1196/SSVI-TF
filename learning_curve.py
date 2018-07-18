@@ -19,10 +19,10 @@ def do_learning_curve(factorizer, tensor):
         print("Using ", size, " of training data ")
         tensor.reduce_train_size(size)
         factorizer.reset()
-        factorizer.factorize(report=50, max_iteration=2000)
+        factorizer.factorize(report=100, max_iteration=4000)
 
 
-def test_learning_curve(datatype, model, diag):
+def test_learning_curve(datatype, model, diag, noise):
     diag_cov = False
     if diag:
         diag_cov = True
@@ -54,7 +54,7 @@ def test_learning_curve(datatype, model, diag):
         eta = 1
         cov_eta = 0.01
 
-    tensor.synthesize_data(dims, means, covariances, hidden_D, noise=100)
+    tensor.synthesize_data(dims, means, covariances, hidden_D, noise=noise)
 
     mean_update = "S"
     cov_update = "N"
@@ -84,14 +84,19 @@ parser = argparse.ArgumentParser(description='3D tensor factorization synthetic 
 parser.add_argument("-d", "--data", type=str, help="data types: binary, real or count")
 parser.add_argument("-m", "--model", type=str, help="model: simple, deterministic or robust")
 parser.add_argument("--diag", action="store_true")
+parser.add_argument("-n", "--noise", type=float, help="noise level")
 
 args = parser.parse_args()
 
 datatype = args.data
 model    = args.model
 diag     = args.diag
+noise    = args.noise
+
+if noise is None:
+    noise = 0.1
 
 assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
 
-test_learning_curve(datatype, model, diag)
+test_learning_curve(datatype, model, diag, noise)

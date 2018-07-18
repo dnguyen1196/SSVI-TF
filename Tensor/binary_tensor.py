@@ -4,7 +4,7 @@ import numpy as np
 
 class binary_tensor(Tensor):
     def __init__(self, binary_cutoff=0.):
-        super(binary_tensor, self).__init__(datatype="binary", binary_cutoff=binary_cutoff)
+        super(binary_tensor, self).__init__(datatype="binary")
 
         # self.link_fun = lambda x: probs.sigmoid(x)
         self.binary_cutoff = binary_cutoff
@@ -22,15 +22,7 @@ class binary_tensor(Tensor):
 
         return matrices
 
-    def compute_entry_value(self, entry):
-        ui = np.ones((self.D,))
-        ndim = len(self.dims)
-
-        for dim in range(ndim):
-            row_num = entry[dim]
-            ui = np.multiply(ui, self.matrices[dim][row_num, :])
-
-        m = np.sum(ui)
+    def data_link_fun(self, m):
         return 1 if m >= self.binary_cutoff else -1
 
     def actual_value(self, m):

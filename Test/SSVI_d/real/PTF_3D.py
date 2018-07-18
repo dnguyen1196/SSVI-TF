@@ -8,6 +8,7 @@ np.random.seed(seed=314)
 from Model.TF_Models import Posterior_Full_Covariance
 from SSVI.SSVI_TF_d import SSVI_TF_d
 from Tensor.Tensor import Tensor
+from Tensor.real_tensor import RV_tensor
 
 np.random.seed(seed=317) # For control and comparisons
 # Generate synthesize tensor, true, this is what we try to recover
@@ -15,10 +16,10 @@ dims     = [50, 50, 50]
 hidden_D = 20
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
-data = Tensor()
+data = RV_tensor()
 
 # tensor.synthesize_real_data(dims, means, covariances, hidden_D, 0.8, 1)
-data.synthesize_real_data(dims, means, covariances, hidden_D, 0.2, 1, noise=1)
+data.synthesize_data(dims, means, covariances, hidden_D, 0.2, 1, noise=0.1)
 
 
 ################## MODEL and FACTORIZATION #########################

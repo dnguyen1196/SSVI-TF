@@ -23,15 +23,7 @@ class count_tensor(Tensor):
 
         return matrices
 
-    def compute_entry_value(self, entry):
-        ui = np.ones((self.D,))
-        ndim = len(self.dims)
-
-        for dim in range(ndim):
-            row_num = entry[dim]
-            ui = np.multiply(ui, self.matrices[dim][row_num, :])
-
-        m = np.sum(ui)
+    def data_link_fun(self, m):
         f = self.link_fun(m)
         x = int(np.rint(f))
         self.max_count = max(self.max_count, x)

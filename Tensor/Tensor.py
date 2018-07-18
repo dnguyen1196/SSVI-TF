@@ -10,7 +10,7 @@ from abc import abstractclassmethod, abstractmethod
 
 
 class Tensor(object):
-    def  __init__(self, datatype="real", binary_cutoff=0.0):
+    def  __init__(self, datatype="real"):
         """
         :param datatype:
         :param binary_cutoff:
@@ -19,17 +19,9 @@ class Tensor(object):
 
         self.datatype = datatype
 
-        if self.datatype == "real":
-            self.link_fun = lambda m : m
-        elif self.datatype == "binary":
-            self.link_fun = lambda x : probs.sigmoid(x)
-            self.binary_cutoff = binary_cutoff
-        elif self.datatype == "count":
-            self.link_fun = lambda m : probs.poisson_link(m)
-
     """
     """
-    def synthesize_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=1.):
+    def synthesize_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=0.1):
         """
         :param dims:
         :param means:
@@ -39,7 +31,7 @@ class Tensor(object):
         :param sparsity:
         :return:
         """
-        print("Generating synthetic ", self.datatype , "valued data ... ")
+        print("Generating synthetic", self.datatype , "valued data ... ")
         start = time.time()
         self.dims = dims
         self.D = D
@@ -74,7 +66,6 @@ class Tensor(object):
 
     def reduce_train_size(self, train_ratio):
         """
-
         :param train_ratio:
         :return:
         """
@@ -111,8 +102,23 @@ class Tensor(object):
 
         return observed_vals
 
-    @abstractmethod
     def compute_entry_value(self, entry):
+        ui = np.ones((self.D,))
+        ndim = len(self.dims)
+        for dim in range(ndim):
+            row_num = entry[dim]
+            ui = np.multiply(ui, self.matrices[dim][row_num, :])
+
+        m = np.sum(ui)
+        if self.noise != 0:
+            s = np.random.normal(0, self.noise * np.abs(m))
+        else:
+            s = 0
+
+        return self.data_link_fun(m + s)
+
+    @abstractmethod
+    def data_link_fun(self, f):
         raise NotImplementedError
 
     """

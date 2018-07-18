@@ -14,21 +14,8 @@ class RV_tensor(Tensor):
             matrices[i] = self.create_random_matrix(self.dims[i], self.D, means[i], covariances[i])
         return matrices
 
-    def compute_entry_value(self, entry):
-        ui = np.ones((self.D,))
-        ndim = len(self.dims)
-
-        for dim in range(ndim):
-            row_num = entry[dim]
-            ui = np.multiply(ui, self.matrices[dim][row_num, :])
-
-        m = np.sum(ui)
-        if self.noise != 0:
-            s = np.random.normal(0, self.noise)
-        else:
-            s = 0
-
-        return m + s
+    def data_link_fun(self, m):
+        return m
 
     def actual_value(self, m):
         return m
