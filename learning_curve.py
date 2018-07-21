@@ -20,8 +20,6 @@ def do_learning_curve(factorizer, tensor, iter_num):
         tensor.reduce_train_size(size)
         factorizer.reset()
         factorizer.factorize(report=100, max_iteration=iter_num)
-        # TODO: change to 2000
-
 
 def test_learning_curve(datatype, model, diag, noise, iter_num):
     diag_cov = False
@@ -99,7 +97,7 @@ iter_num = args.iter
 if noise is None:
     noise = 0.1
 if iter_num is None:
-    iter_num = 2000
+    iter_num = 4000
 
 assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
