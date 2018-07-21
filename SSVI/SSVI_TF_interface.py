@@ -38,8 +38,10 @@ class SSVI_TF(object):
             self.posterior        = Posterior_Diag_Covariance(self.dims, self.D, mean0, cov0)
             self.ada_acc_grad_cov = [np.zeros((self.D, s)) for s in self.dims]
 
-        self.mean0  = mean0
-        self.cov0   = cov0
+        self.mean0    = mean0
+        self.cov0     = cov0
+        self.w_sigma0 = sigma0
+
         self.w_sigma = sigma0
         self.k1     = k1
         self.k2     = k2
@@ -681,6 +683,21 @@ class SSVI_TF(object):
 
     """
     Reset function
+    TODO: reset self too
     """
     def reset(self):
         self.posterior.reset()
+        self.w_sigma         = self.w_sigma0
+        self.pSigma          = np.ones((len(self.dims),))
+
+        self.time_step = [0 for _ in range(self.order)]
+
+        # Optimization parameter
+        self.ada_acc_grad = [np.zeros((self.D, s)) for s in self.dims]
+        self.norm_changes = [np.zeros((s, 2)) for s in self.dims]
+
+        if self.noise_added:
+            # For simple and robust model
+            self.w_tau = 1.
+            self.w_sigma = 1.
+            self.w_ada_grad = 0.

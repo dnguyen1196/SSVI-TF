@@ -13,7 +13,6 @@ class SSVI_TF_simple(SSVI_TF):
         self.w_tau = 1.
         self.w_sigma = 1.
         self.w_ada_grad = 0.
-
         self.noise_added = True
 
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):

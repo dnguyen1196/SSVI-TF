@@ -13,16 +13,17 @@ from SSVI.SSVI_TF_simple import SSVI_TF_simple
 
 np.random.seed(seed=319)
 
-def do_learning_curve(factorizer, tensor):
+def do_learning_curve(factorizer, tensor, iter_num):
     train_curve = [0.2, 0.4, 0.6, 0.8, 1]
     for size in train_curve:
         print("Using ", size, " of training data ")
         tensor.reduce_train_size(size)
         factorizer.reset()
-        factorizer.factorize(report=100, max_iteration=4000)
+        factorizer.factorize(report=100, max_iteration=iter_num)
+        # TODO: change to 2000
 
 
-def test_learning_curve(datatype, model, diag, noise):
+def test_learning_curve(datatype, model, diag, noise, iter_num):
     diag_cov = False
     if diag:
         diag_cov = True
@@ -78,13 +79,14 @@ def test_learning_curve(datatype, model, diag, noise):
                                 mean0=mean0, cov0=cov0, k1=64, k2=64, \
                                 eta=eta, cov_eta=cov_eta)
 
-    do_learning_curve(factorizer, tensor)
+    do_learning_curve(factorizer, tensor, iter_num)
 
 parser = argparse.ArgumentParser(description='3D tensor factorization synthetic data')
 parser.add_argument("-d", "--data", type=str, help="data types: binary, real or count")
 parser.add_argument("-m", "--model", type=str, help="model: simple, deterministic or robust")
 parser.add_argument("--diag", action="store_true")
 parser.add_argument("-n", "--noise", type=float, help="noise level")
+parser.add_argument("-i", "--iter", type=int, help="number of iterations")
 
 args = parser.parse_args()
 
@@ -92,11 +94,14 @@ datatype = args.data
 model    = args.model
 diag     = args.diag
 noise    = args.noise
+iter_num = args.iter
 
 if noise is None:
     noise = 0.1
+if iter_num is None:
+    iter_num = 2000
 
 assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
 
-test_learning_curve(datatype, model, diag, noise)
+test_learning_curve(datatype, model, diag, noise, iter_num)
