@@ -1,7 +1,10 @@
 # Testing
 - Look at implementation and see where I could do some speed up, 
 in terms of order of computation
-- Rerun diagonal covariance_
+- Report accuracy for binary prediction instead of RSME
+- The robust model is not stable :| -> cov_eta is the problem
+Look at the results I have it seems that after some iterations, at one point
+the d_cov shoot up :| really mysteriously. Let's run 50 x 3 for a while and see
 
 # diagonal covariance
 
@@ -14,21 +17,13 @@ in terms of order of computation
 and weird)
 
 # Problem with robust TF
-- Need to fix robust count 
-- Robust binary and real seem to be working ? => just need more data to look at
-
--> May be if the norm of covgrad is too big -> then ignore this update for now?
-Capping the covariance update seems to work for now? -> Need to figure out exactly what's up
-
--> Removing the negative eigenvalues dosent seem to do the trick 
--> but capping the covariance seems to produce very shitty results?
--> diagonal covariance seems to be a good choice to deal with covariance problem
-in robust model
-
--> Check simple prediction for binary -> bound is 1/2
+- The covariance becoming non-positive definite
 
 
-# Questions: 
+
+
+# Order of comparisons
+- deterministi, robust, simple
 
 
 

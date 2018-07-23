@@ -39,19 +39,18 @@ def test_learning_curve(datatype, model, diag, noise, iter_num):
         tensor = RV_tensor()
         mean0 = np.ones((D,)) * 5
         eta = 1
-        cov_eta = 0.01
 
     elif datatype == "binary":
         tensor = binary_tensor()
         mean0 = np.zeros((D,))
         eta = 1
-        cov_eta = 0.01
 
     elif datatype == "count":
         tensor = count_tensor()
         mean0 = np.zeros((D,))
         eta = 1
-        cov_eta = 0.01
+
+    cov_eta = 1
 
     tensor.synthesize_data(dims, means, covariances, hidden_D, noise=noise)
 
@@ -72,6 +71,9 @@ def test_learning_curve(datatype, model, diag, noise, iter_num):
                                mean0=mean0, cov0=cov0)
 
     elif model == "robust":
+        if datatype == "binary" or datatype == "count":
+            cov_eta = 0.001
+
         factorizer = SSVI_TF_robust(tensor, rank=fact_D, \
                                 mean_update=mean_update, cov_update=cov_update, diag=diag_cov, \
                                 mean0=mean0, cov0=cov0, k1=64, k2=64, \
