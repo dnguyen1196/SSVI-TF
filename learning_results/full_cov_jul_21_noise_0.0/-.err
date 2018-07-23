@@ -1,0 +1,3 @@
+usage: learning_curve.py [-h] [-d DATA] [-m MODEL] [--diag] [-n NOISE]
+                         [-i ITER]
+learning_curve.py: error: argument -d/--data: expected one argument
