@@ -13,73 +13,70 @@ from SSVI.SSVI_TF_simple import SSVI_TF_simple
 
 np.random.seed(seed=319)
 
+default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20}
+
+def get_factorizer_param(model, datatype):
+    if model == "deterministic" or model == "simple" or datatype == "real":
+        return  {"eta" : 1, "cov_eta" : 1}
+    if model == "robust":
+        return  {"eta" : 1, "cov_eta" : 0.001}
+    return None
+
+def get_init_values(datatype, D):
+    cov0 = np.eye(D)
+    if datatype == "real":
+        mean0 = np.ones((D,)) * 5
+    else:
+        mean0 = np.zeros((D,))
+    return {"cov0" : cov0, "mean0" : mean0}
+
+def synthesize_tensor(datatype, noise, noise_ratio):
+    dims = [50, 50, 50]
+    real_dim = 100
+    means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 10, np.ones((real_dim,)) * 2]
+    covariances = [np.eye(real_dim) * 2, np.eye(real_dim) * 3, np.eye(real_dim) * 2]
+
+    if datatype == "binary":
+        tensor = binary_tensor()
+    elif datatype == "real":
+        tensor = RV_tensor()
+    elif datatype == "count":
+        tensor = count_tensor()
+
+    tensor.synthesize_data(dims, means, covariances, real_dim, \
+                           train=0.8, sparsity=1, noise=noise, noise_ratio=noise_ratio)
+    return tensor
+
 def do_learning_curve(factorizer, tensor, iter_num):
-    train_curve = [0.2, 0.4, 0.6, 0.8, 1]
+    train_curve = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1]
     for size in train_curve:
         print("Using ", size, " of training data ")
         tensor.reduce_train_size(size)
         factorizer.reset()
         factorizer.factorize(report=100, max_iteration=iter_num)
 
-def test_learning_curve(datatype, model, diag, noise, iter_num):
-    diag_cov = False
-    if diag:
-        diag_cov = True
-
-    assert (datatype in ["real", "binary", "count"])
-    assert (model in ["deterministic", "simple", "robust"])
-
-    dims = [50, 50, 50]
-    hidden_D = 20
-    means = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
-    covariances = [np.eye(hidden_D) * 2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
-
+def test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio):
+    model = "robust"
+    datatype = "real"
     D = 20
-    if datatype == "real":
-        tensor = RV_tensor()
-        mean0 = np.ones((D,)) * 5
-        eta = 1
 
-    elif datatype == "binary":
-        tensor = binary_tensor()
-        mean0 = np.zeros((D,))
-        eta = 1
+    synthetic_tensor = synthesize_tensor(datatype, noise, noise_ratio)
+    factorizer_param = get_factorizer_param(model, datatype)
+    init_vals = get_init_values(datatype, D)
+    params = {**default_params, **factorizer_param, **init_vals, "tensor": synthetic_tensor}
 
-    elif datatype == "count":
-        tensor = count_tensor()
-        mean0 = np.zeros((D,))
-        eta = 1
-
-    cov_eta = 1
-
-    tensor.synthesize_data(dims, means, covariances, hidden_D, noise=noise)
-
-    mean_update = "S"
-    cov_update = "N"
-    fact_D = 20
-    cov0 = np.eye(D)
+    diag = False  # full or diagonal covariance
+    params["diag"] = diag
 
     if model == "deterministic":
-        factorizer = SSVI_TF_d(tensor, rank=fact_D, \
-                               mean_update=mean_update, cov_update=cov_update, diag=diag_cov,\
-                               k1=64, k2=64, \
-                               mean0=mean0, cov0=cov0)
+        factorizer = SSVI_TF_d(**params)
     elif model == "simple":
-        factorizer = SSVI_TF_simple(tensor, rank=fact_D, \
-                               mean_update=mean_update, cov_update=cov_update, diag=diag_cov, \
-                               k1=64, k2=64, \
-                               mean0=mean0, cov0=cov0)
-
+        factorizer = SSVI_TF_simple(**params)
     elif model == "robust":
-        if datatype == "binary" or datatype == "count":
-            cov_eta = 0.001
-
-        factorizer = SSVI_TF_robust(tensor, rank=fact_D, \
-                                mean_update=mean_update, cov_update=cov_update, diag=diag_cov, \
-                                mean0=mean0, cov0=cov0, k1=64, k2=64, \
-                                eta=eta, cov_eta=cov_eta)
+        factorizer = SSVI_TF_robust(**params)
 
     do_learning_curve(factorizer, tensor, iter_num)
+
 
 parser = argparse.ArgumentParser(description='3D tensor factorization synthetic data')
 parser.add_argument("-d", "--data", type=str, help="data types: binary, real or count")
@@ -87,6 +84,7 @@ parser.add_argument("-m", "--model", type=str, help="model: simple, deterministi
 parser.add_argument("--diag", action="store_true")
 parser.add_argument("-n", "--noise", type=float, help="noise level")
 parser.add_argument("-i", "--iter", type=int, help="number of iterations")
+parser.add_argument("-r", "--ratio", action="store_true")
 
 args = parser.parse_args()
 
@@ -95,6 +93,7 @@ model    = args.model
 diag     = args.diag
 noise    = args.noise
 iter_num = args.iter
+noise_ratio = args.ratio
 
 if noise is None:
     noise = 0.1
@@ -104,4 +103,4 @@ if iter_num is None:
 assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
 
-test_learning_curve(datatype, model, diag, noise, iter_num)
+test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio)

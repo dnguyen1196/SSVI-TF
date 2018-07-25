@@ -151,7 +151,7 @@ class SSVI_TF_robust(SSVI_TF):
                 u = np.multiply(u, m)
             return np.sum(u)
 
-        res = self.estimate_expected_observation_sampling(entry)
+        res = self.estimate_expected_observation_via_sampling(entry)
         if self.likelihood_type == "bernoulli":
             return 1 if res > 1/2 else -1
 

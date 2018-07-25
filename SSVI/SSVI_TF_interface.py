@@ -411,31 +411,37 @@ class SSVI_TF(object):
             print("Covariance update : ", self.cov_update)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
-            print("iteration |   time   |test_rsme |train_rsme|  d_mean  |   d_cov  |", end=" ")
-            if self.likelihood_type == "poisson":
-                print("test_nll | train_nll ", end=" ")
+            print("iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  |", end=" ")
+            print("test_nll | train_nll ", end=" ")
 
             if self.noise_added:
-                print("   dw   ")
+                print("|   dw   |")
             else:
                 print("")
 
         current = time.time()
         dec = 4
+        rsme_train, error_train = self.evaluate_train_error()
+        rsme_test, error_test   = self.evaluate_test_error()
 
-        print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
+        print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
               .format(iteration, np.around(current - start,2),\
-              np.around(self.evaluate_test_error(), dec),\
-              np.around(self.evaluate_train_error(), dec), \
+              np.around(rsme_test, dec), \
+              np.around(error_test, dec), \
+              np.around(rsme_train, dec), \
+              np.around(error_train, dec),\
               np.around(mean_change, dec),\
               np.around(cov_change, dec)), end=" ")
 
-        if self.likelihood_type == "poisson":
-            print('{:^10} {:^10}'\
-                  .format(np.around(\
-                            self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals), 2), \
-                          np.around(\
-                            self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals), 2)), end=" ")
+        # test_nll = self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals)
+        # train_nll = self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals)
+
+        test_nll = self.estimate_negative_log_likelihood(self.tensor.test_entries, self.tensor.test_vals)
+        train_nll = self.estimate_negative_log_likelihood(self.tensor.train_entries, self.tensor.train_vals)
+
+        print('{:^10} {:^10}'\
+              .format(np.around(test_nll, 2), \
+                      np.around(train_nll, 2)), end=" ")
 
         if self.noise_added:
             print('{:^10}'.format(np.around(self.w_changes, dec)))
@@ -466,6 +472,28 @@ class SSVI_TF(object):
             nll       -= np.log(likelihood)
         return nll
 
+    def estimate_negative_log_likelihood(self, entries, vals):
+        nll = 0.
+        dims = np.arange(len(self.dims))
+        s    = self.likelihood_param
+
+        for i in range(len(vals)):
+            entry = entries[i]
+            expanded_entry = np.expand_dims(entry, axis=0)
+            vjs = self.sample_vjs_batch(expanded_entry, dims, self.k1) # vjs.shape = (k1, D)
+            # print("vjs.shape = ", vjs.shape)
+            vs = vjs[0, :, :]
+
+            ms  = np.sum(vs, axis=1) # shape (k1,)
+            w   = np.random.rayleigh(np.square(self.w_sigma), self.k1)
+            fs  = np.random.normal(ms, w, size=(self.k1, self.k1))
+
+            # expected_ll = np.mean(np.mean(self.likelihood.pdf(vals[i], fs, s), axis=0))
+            expected_ll = np.mean(self.likelihood.pdf(vals[i], fs, s))
+            nll -= np.log(expected_ll)
+
+        return nll
+
     def check_stop_cond(self):
         """
         :return: boolean
@@ -487,14 +515,13 @@ class SSVI_TF(object):
 
     def evaluate_train_error(self):
         # error = self.evaluate_error(self.tensor.train_entries, self.tensor.train_vals)
-        error = self.evaluate_RSME(self.tensor.train_entries, self.tensor.train_vals)
-        return error
-
+        rsme, error = self.evaluate_RSME(self.tensor.train_entries, self.tensor.train_vals)
+        return rsme, error
 
     def evaluate_test_error(self):
         # error = self.evaluate_error(self.tensor.test_entries, self.tensor.test_vals)
-        error = self.evaluate_RSME(self.tensor.test_entries, self.tensor.test_vals)
-        return error
+        rsme, error = self.evaluate_RSME(self.tensor.test_entries, self.tensor.test_vals)
+        return rsme, error
 
     def evaluate_error(self, entries, vals):
         """
@@ -506,10 +533,8 @@ class SSVI_TF(object):
             correct = vals[i]
             if self.likelihood_type == "normal":
                 error += np.abs(predict - correct)/abs(correct)
-
             elif self.likelihood_type == "bernoulli":
                 error += 1 if predict != correct else 0
-
             elif self.likelihood_type == "poisson":
                 error += np.abs(predict - correct)
             else:
@@ -518,16 +543,24 @@ class SSVI_TF(object):
         return error/len(entries)
 
     def evaluate_RSME(self, entries, vals):
+        rsme = 0.0
         error = 0.0
 
         for i in range(len(entries)):
             predict = self.predict_entry(entries[i])
             correct = vals[i]
-            error += np.square(predict - correct)
+            rsme += np.square(predict - correct)
 
-        rsme = np.sqrt(error/len(vals))
+            if self.likelihood_type == "normal":
+                error += np.abs(predict - correct)/abs(correct)
+            elif self.likelihood_type == "bernoulli":
+                error += 1 if predict != correct else 0
+            elif self.likelihood_type == "poisson":
+                error += np.abs(predict - correct)
 
-        return rsme
+        rsme = np.sqrt(rsme/len(vals))
+        error = error/len(vals)
+        return rsme, error
 
     """
     Predict entry function
@@ -551,7 +584,7 @@ class SSVI_TF(object):
             return 1 if np.sum(u) > 0 else -1
         # For other cases, do samplings to estimate
         else:
-            res = self.estimate_expected_observation_sampling(entry)
+            res = self.estimate_expected_observation_via_sampling(entry)
             if self.likelihood_type == "bernoulli":
                 return 1 if res > 1/2 else -1
             elif self.likelihood_type == "poisson":
@@ -659,7 +692,7 @@ class SSVI_TF(object):
 
         return np.mean(counts)
 
-    def estimate_expected_observation_sampling(self, entry):
+    def estimate_expected_observation_via_sampling(self, entry):
         ms = np.ones((self.predict_num_samples, self.D))
 
         for dim, i in enumerate(entry):
@@ -683,7 +716,6 @@ class SSVI_TF(object):
 
     """
     Reset function
-    TODO: reset self too
     """
     def reset(self):
         self.posterior.reset()

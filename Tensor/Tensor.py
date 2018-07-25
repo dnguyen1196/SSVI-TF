@@ -21,7 +21,7 @@ class Tensor(object):
 
     """
     """
-    def synthesize_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=0.1):
+    def synthesize_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=0.1, noise_ratio=True):
         """
         :param dims:
         :param means:
@@ -37,6 +37,7 @@ class Tensor(object):
         self.D = D
         self.train = train
         self.noise = noise
+        self.noise_ratio = noise_ratio
 
         self.matrices = self.generate_hidden_matrices(means, covariances)
 
@@ -110,12 +111,17 @@ class Tensor(object):
             ui = np.multiply(ui, self.matrices[dim][row_num, :])
 
         m = np.sum(ui)
-        if self.noise != 0:
-            s = np.random.normal(0, self.noise * np.abs(m))
-        else:
-            s = 0
 
-        return self.data_link_fun(m + s)
+        if self.noise != 0:
+            if self.noise_ratio: # If noise level is relative to m
+                stddev = self.noise * np.abs(m)
+            else: # If noise level is fixed stddev
+                stddev = self.noise
+            f = np.random.normal(m, stddev)
+        else:
+            f = m
+
+        return self.data_link_fun(f)
 
     @abstractmethod
     def data_link_fun(self, f):

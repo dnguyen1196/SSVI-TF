@@ -8,8 +8,7 @@ np.random.seed(seed=317)
 # Generate synthesize data, true, this is what we try to recover
 
 dims     = [50, 50, 50]
-# dims = [10,10,10]
-hidden_D = 20
+hidden_D = 100
 means    = [np.ones((hidden_D,)) * 5, np.ones((hidden_D,)) * 10, np.ones((hidden_D,)) * 2]
 covariances = [np.eye(hidden_D) *2, np.eye(hidden_D) * 3, np.eye(hidden_D) * 2]
 data = Tensor()
