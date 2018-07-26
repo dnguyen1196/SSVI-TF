@@ -99,8 +99,17 @@ noise    = args.noise
 iter_num = args.iter
 noise_ratio = args.ratio
 
+
 if noise is None:
     noise = 0.1
+
+if not noise_ratio:
+    if datatype == "real":
+        noise = 500
+    elif datatype == "binary":
+        noise = 0.5
+    elif datatype == "count":
+        noise = 1
 
 if iter_num is None:
     iter_num = 8000

@@ -55,7 +55,7 @@ def synthesize_tensor(datatype):
 
 
 model    = "robust"
-datatype = "real"
+datatype = "count"
 D        = 20
 diag = False # full or diagonal covariance
 default_params["diag"] = diag

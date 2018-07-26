@@ -12,6 +12,11 @@ the d_cov shoot up :| really mysteriously. Let's run 50 x 3 for a while and see
 - Implement different sorts of error -> both RSME and actual error rate for binary
 data
 
+
+hard noise for real -> 500
+hard noise for binary -> 0.5
+hard noise for count -> 1
+
 # extra implementation
 
 

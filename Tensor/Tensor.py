@@ -111,7 +111,7 @@ class Tensor(object):
             ui = np.multiply(ui, self.matrices[dim][row_num, :])
 
         m = np.sum(ui)
-
+        # print(m)
         if self.noise != 0:
             if self.noise_ratio: # If noise level is relative to m
                 stddev = self.noise * np.abs(m)
