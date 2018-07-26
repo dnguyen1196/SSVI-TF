@@ -68,10 +68,10 @@ def test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio):
     datatype = "real"
     D = 20
 
-    synthetic_tensor = synthesize_tensor(datatype, noise, noise_ratio)
-    factorizer_param = get_factorizer_param(model, datatype)
+    tensor = synthesize_tensor(datatype, noise, noise_ratio)
+    factorizer_param = get_factorizer_param(model, datatype, diag)
     init_vals = get_init_values(datatype, D)
-    params = {**default_params, **factorizer_param, **init_vals, "tensor": synthetic_tensor}
+    params = {**default_params, **factorizer_param, **init_vals, "tensor": tensor}
 
     diag = False  # full or diagonal covariance
     params["diag"] = diag
