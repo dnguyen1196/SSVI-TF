@@ -4,14 +4,13 @@ import numpy as np
 from numpy.linalg import inv, norm, eig, eigh
 
 class SSVI_TF_robust(SSVI_TF):
-    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", diag=False, \
-                 mean0=None, cov0=None,\
-                 sigma0=1,k1=50, k2=50, batch_size=128, \
-                 eta=1, cov_eta=1, sigma_eta=1):
+    def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
+                 diag=False, mean0=None, cov0=None, sigma0=1, \
+                 unstable_cov=False, k1=64, k2=64, batch_size=128, \
+                 eta=1, cov_eta=0.001, sigma_eta=0.01):
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
-                 mean0, cov0, \
-                 sigma0,k1, k2, batch_size, eta, cov_eta, sigma_eta)
+                 mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta)
 
         self.w_tau = 1.
         self.w_sigma = 1.
@@ -43,7 +42,6 @@ class SSVI_TF_robust(SSVI_TF):
         # assert(uis_batch.shape == vjs_batch.shape)           # sanity check
         # assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
         # assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
-
         ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
 
         # mean_batch.shape = (num_samples, k1)

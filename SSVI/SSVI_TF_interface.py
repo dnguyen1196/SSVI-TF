@@ -16,10 +16,9 @@ import time
 
 class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
-                        diag=False,
-                        mean0=None, cov0=None, sigma0=1,\
-                        k1=64, k2=64, batch_size=128, eta=1, cov_eta=1, sigma_eta=1, \
-                        max_iteration=2000):
+                        diag=False, mean0=None, cov0=None, sigma0=1,\
+                        unstable_cov=False, k1=64, k2=64, batch_size=128, \
+                        eta=1, cov_eta=1, sigma_eta=1):
 
         self.tensor = tensor
         self.dims   = tensor.dims
@@ -41,12 +40,12 @@ class SSVI_TF(object):
         self.mean0    = mean0
         self.cov0     = cov0
         self.w_sigma0 = sigma0
+        self.unstable_cov = unstable_cov
+        self.cov_epsilon  = 1e-7
 
-        self.w_sigma = sigma0
         self.k1     = k1
         self.k2     = k2
         self.batch_size = batch_size
-
         self.predict_num_samples = 32
 
         self.pmu             = np.ones((self.D,))
@@ -105,10 +104,8 @@ class SSVI_TF(object):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
                 # in the dim-th dimension
-
                 # self.update_natural_params(dim, col, iteration)
                 self.update_natural_param_batch(dim, col)
-
                 self.update_hyper_parameter(dim)
 
             # Move on to the next column of the hidden matrices
@@ -118,7 +115,6 @@ class SSVI_TF(object):
 
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.dims[dim]
-
 
             mean_change, cov_change = self.check_stop_cond()
             if iteration != 0 and iteration % self.report == 0:
@@ -173,6 +169,11 @@ class SSVI_TF(object):
             S_next   = self.update_cov_param(dim, i, m, S, di, Di)
             m_next   = self.update_mean_param(dim, i, m, S, di, Di)
 
+        # If covariance is unstable add a small perturbation to S
+        # if self.unstable_cov:
+        #     add    = np.full((self.D,), self.cov_epsilon)
+        #     S_next = S_next + np.diag(add) if not self.diag else S_next + add
+
         if self.noise_added:
             w_sigma        = self.update_sigma_param(si, scale)
             self.w_changes = np.abs(w_sigma - self.w_sigma)
@@ -180,14 +181,12 @@ class SSVI_TF(object):
 
         # Measures the change in the parameters from previous iterations
         # print("dmean: ", np.linalg.norm(m_next - m), " dcov: ", np.linalg.norm(S_next - S, 'fro'))
-
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         """
-
         :param dim:
         :param i:
         :param coords:
@@ -258,6 +257,7 @@ class SSVI_TF(object):
             meanStep = self.compute_stepsize_mean_param(dim, i, meanGrad)
             C_next   = np.multiply(1 -  meanStep, C) + meanStep * meanGrad
             m_next   = np.inner(S, C_next)
+
         else:
             raise Exception("Unidentified update formula for covariance param")
         return m_next
@@ -363,7 +363,6 @@ class SSVI_TF(object):
 
     def compute_stepsize_sigma_param(self, w_grad):
         self.w_ada_grad += np.square(w_grad)
-
         w_step = self.sigma_eta / self.w_ada_grad
         return w_step
 
@@ -449,11 +448,6 @@ class SSVI_TF(object):
             print("")
 
     def estimate_vlb(self, entries, values):
-        # vlb = 0.0
-        # for i in range(len(values)):
-        #     entry = entries[i]
-        #     val   = values[i]
-        #     m, S  = self.compute_posterior_param(entry)
         raise NotImplementedError
 
     def estimate_expected_log_likelihood(self, m, S):
@@ -678,10 +672,9 @@ class SSVI_TF(object):
 
         ms = np.sum(ms, axis=1) # fs.shape == (self.predict_num_samples, )
 
+        # TODO: check dimensionality
         if self.noise_added:
             ws = np.random.rayleigh(self.w_sigma**2, size=self.predict_num_samples)
-
-            # TODO: check dimensionality
             fs = np.random.normal(ms, ws, size=(self.predict_num_samples))
             fs = self.link_fun(fs)
             counts = self.likelihood.sample(fs, (self.predict_num_samples))
@@ -733,3 +726,53 @@ class SSVI_TF(object):
             self.w_tau = 1.
             self.w_sigma = 1.
             self.w_ada_grad = 0.
+
+    def evaluate_true_params(self):
+        train_rsme, train_error = self.evaluate_true_hidden_vectors(self.tensor.train_entries, \
+                                                                    self.tensor.train_vals, \
+                                                                    self.tensor.matrices)
+        test_rsme, test_error = self.evaluate_true_hidden_vectors(self.tensor.test_entries, \
+                                                                    self.tensor.test_vals, \
+                                                                    self.tensor.matrices)
+        print("Evaluation for true params: ")
+        print(" test_rsme | train_rsme | rel-te-err | rel-tr-err |")
+        print("{:^12} {:^12} {:^12} {:^12}".format(\
+            np.around(test_rsme, 4), \
+            np.around(train_rsme, 4), \
+            np.around(test_error, 4), \
+            np.around(train_error, 4)))
+
+    def evaluate_true_hidden_vectors(self, entries, vals, matrices):
+        rsme = 0.0
+        error = 0.0
+
+        for i in range(len(entries)):
+            predict = self.true_model_predict(entries[i], matrices)
+            correct = vals[i]
+            rsme += np.square(predict - correct)
+
+            if self.likelihood_type == "normal":
+                error += np.abs(predict - correct)/abs(correct)
+            elif self.likelihood_type == "bernoulli":
+                error += 1 if predict != correct else 0
+            elif self.likelihood_type == "poisson":
+                error += np.abs(predict - correct)
+
+        rsme = np.sqrt(rsme/len(vals))
+        error = error/len(vals)
+        return rsme, error
+
+    # TODO: what to do with noise? for now just ignore it?
+    def true_model_predict(self, entry, matrices):
+        actual_d = self.tensor.D
+        ms       = np.ones((actual_d,))
+        for dim, col in enumerate(entry):
+            ms = np.multiply(ms, matrices[dim][col, :])
+
+        f  = np.sum(ms)
+        if self.datatype == "real":
+            return f
+        elif self.datatype == "binary":
+            return 1 if f > 0 else -1
+        elif self.datatype == "count":
+            return self.link_fun(f)

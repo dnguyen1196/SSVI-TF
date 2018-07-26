@@ -357,3 +357,28 @@ class Tensor(object):
             m = np.sum(ui)
             f = self.actual_value(m)
             assert (f == actual)
+
+    def evaluate_true_params(self):
+        print("Evaluation for true params: ")
+        print(" test_rsme | train_rsme | rel-te-err | rel-tr-err | train_nll | test_nll  |")
+
+
+    def evaluate_error(self, entries, vals):
+        rsme = 0.0
+        error = 0.0
+
+        for i in range(len(entries)):
+            predict = self.predict_entry(entries[i])
+            correct = vals[i]
+            rsme += np.square(predict - correct)
+
+            if self.likelihood_type == "normal":
+                error += np.abs(predict - correct)/abs(correct)
+            elif self.likelihood_type == "bernoulli":
+                error += 1 if predict != correct else 0
+            elif self.likelihood_type == "poisson":
+                error += np.abs(predict - correct)
+
+        rsme = np.sqrt(rsme/len(vals))
+        error = error/len(vals)
+        return rsme, error

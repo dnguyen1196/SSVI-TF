@@ -13,8 +13,6 @@ the d_cov shoot up :| really mysteriously. Let's run 50 x 3 for a while and see
 data
 
 # extra implementation
-- Generate data using both fixed and variable stddev
-- Learning curve -> smaller portion of data 2%, 5%, 10%, 15%, 20%, 
 
 
 # diagonal covariance
