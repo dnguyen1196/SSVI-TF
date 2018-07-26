@@ -1,7 +1,7 @@
 #!/bin/bash
 module load python/3.5.0
 
-opts="-p batch -c 2 --mem=4000 --time=4-00:00:00 --mail-type=ALL --mail-user=$USER"
+opts="-p batch -c 2 --mem=4000 --time=8-00:00:00 --mail-type=ALL --mail-user=$USER"
 
 read outdir # output directory
 read diag   # diagonal formulation
