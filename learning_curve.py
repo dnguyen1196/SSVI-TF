@@ -11,6 +11,10 @@ from SSVI.SSVI_TF_robust import SSVI_TF_robust
 from SSVI.SSVI_TF_d import SSVI_TF_d
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 
+import warnings
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+
 np.random.seed(seed=319)
 
 default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20, "k1" : 64, "k2" : 64}
