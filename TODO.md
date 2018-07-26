@@ -40,5 +40,5 @@ and weird)
 
 
 full_cov_jul_25_hard_noise
-full_cov_jul_20_noise_0.25  
+full_cov_jul_20_noise_0.1  
 full_cov_jul_25_no_noise

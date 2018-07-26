@@ -112,7 +112,7 @@ if not noise_ratio:
         noise = 1
 
 if iter_num is None:
-    iter_num = 8000
+    iter_num = 6000
 
 assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
