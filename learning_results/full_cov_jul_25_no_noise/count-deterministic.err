@@ -1,0 +1,22 @@
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py:391: RuntimeWarning: covariance is not positive-semidefinite.
+  vj_sample = np.random.multivariate_normal(mi, Si, size=k)
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py:40: RuntimeWarning: covariance is not positive-semidefinite.
+  uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
+Traceback (most recent call last):
+  File "learning_curve.py", line 129, in <module>
+    
+  File "learning_curve.py", line 86, in test_learning_curve
+    do_learning_curve(factorizer, tensor, iter_num)
+  File "learning_curve.py", line 64, in do_learning_curve
+    factorizer.factorize(report=500, max_iteration=iter_num)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 108, in factorize
+    self.update_natural_param_batch(dim, col)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 169, in update_natural_param_batch
+    S_next   = self.update_cov_param(dim, i, m, S, di, Di)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 281, in update_cov_param
+    S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+  File "/cluster/home/mnguye16/.local/lib/python3.5/site-packages/numpy/linalg/linalg.py", line 528, in inv
+    ainv = _umath_linalg.inv(a, signature=signature, extobj=extobj)
+  File "/cluster/home/mnguye16/.local/lib/python3.5/site-packages/numpy/linalg/linalg.py", line 89, in _raise_linalgerror_singular
+    raise LinAlgError("Singular matrix")
+numpy.linalg.linalg.LinAlgError: Singular matrix

@@ -11,6 +11,7 @@ the d_cov shoot up :| really mysteriously. Let's run 50 x 3 for a while and see
 - Implement functions to check error of the true model
 - Implement different sorts of error -> both RSME and actual error rate for binary
 data
+- change evaluation of true model to incorporate noise?
 
 
 hard noise for real -> 500
@@ -34,24 +35,25 @@ and weird)
 - The covariance becoming non-positive definite
 
 
+Results for
 
-binary deterministic
-count deterministic
-real simple
-binary simple
-count simple
-real robust
-binary robust
-count robust
+No noise
+All binary -> singular matrix problem
+All count -> singular matrix problem
+All real  -> also singular matrix problem? reset?
+For no noise, they all ran for 0.01 and then die
 
+hard noise
+All binary -> also singular matrix problem
+All count  -> also singular matrix problem
+All real   -> obtain results, OK
+Die before 0.01
 
--p batch -c 2 --mem=4196 --time=4-00:00:00 --mail-type=ALL --mail-user=$USER --wrap="python learning_curve.py -d real -m deterministic" 
+ratio noise
+binary -> deterministic is ok, 
+       -> robust dies before 0.01
+       -> simple also dies beore 0.01       
+count -> deterministic is ok?
+      -> simple dies 
+real  -> 
 
-
-full_cov_jul_25_hard_noise/
-full_cov_jul_25_no_noise/
-full_cov_jul_25_ratio_0.1/
-
-full_cov_jul_25_hard_noise
-full_cov_jul_20_noise_0.1  
-full_cov_jul_25_no_noise

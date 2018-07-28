@@ -1,0 +1,6 @@
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py:390: RuntimeWarning: covariance is not positive-semidefinite.
+  vj_sample = np.random.multivariate_normal(mi, np.diag(Si), size=k)
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py:39: RuntimeWarning: covariance is not positive-semidefinite.
+  uis_batch = np.random.multivariate_normal(m, np.diag(S), size=(num_subsamples,self.k1))
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py:668: RuntimeWarning: covariance is not positive-semidefinite.
+  samples = np.random.multivariate_normal(m, np.diag(S), size=(self.predict_num_samples))

@@ -737,10 +737,10 @@ class SSVI_TF(object):
         print("Evaluation for true params: ")
         print(" test_rsme | train_rsme | rel-te-err | rel-tr-err |")
         print("{:^12} {:^12} {:^12} {:^12}".format(\
-            np.around(test_rsme, 4), \
-            np.around(train_rsme, 4), \
-            np.around(test_error, 4), \
-            np.around(train_error, 4)))
+            np.around(test_rsme, 10), \
+            np.around(train_rsme, 10), \
+            np.around(test_error, 10), \
+            np.around(train_error, 10)))
 
     def evaluate_true_hidden_vectors(self, entries, vals, matrices):
         rsme = 0.0
@@ -773,6 +773,22 @@ class SSVI_TF(object):
         if self.datatype == "real":
             return f
         elif self.datatype == "binary":
-            return 1 if f > 0 else -1
+            # return 1 if f > 1/2 else -1
+            return 1 if self.true_model_predict_via_sampling(f) > 1/2 else -1
         elif self.datatype == "count":
-            return self.link_fun(f)
+            return self.true_model_predict_via_sampling(f)
+
+
+    def true_model_predict_via_sampling(self, f):
+        noise_ratio = self.tensor.noise_ratio
+        if noise_ratio:
+            w = np.abs(f) * noise_ratio
+        else:
+            w = self.tensor.noise
+
+        num_samples = 50
+        ws = np.random.normal(0, w, size=(num_samples,))
+        f_noised = np.add(f, ws)
+        ps = self.link_fun(f_noised)
+        p = np.mean(ps)
+        return p

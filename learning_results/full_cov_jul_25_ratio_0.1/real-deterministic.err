@@ -1,0 +1,5 @@
+slurmstepd: *** JOB 32715777 ON m4lmem01 CANCELLED AT 2018-07-26T00:37:42 ***
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py:391: RuntimeWarning: covariance is not positive-semidefinite.
+  vj_sample = np.random.multivariate_normal(mi, Si, size=k)
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py:40: RuntimeWarning: covariance is not positive-semidefinite.
+  uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))

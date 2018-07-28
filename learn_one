@@ -1,5 +1,13 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/full_cov_jul_21_noise_0.2/
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/full_cov_jul_25_hard_noise/
 false
-0.2
+0.0
 false
 real deterministic
+binary deterministic
+count deterministic
+real simple
+binary simple
+count simple
+real robust
+binary robust
+count robust

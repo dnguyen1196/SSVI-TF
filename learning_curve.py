@@ -11,6 +11,10 @@ from SSVI.SSVI_TF_robust import SSVI_TF_robust
 from SSVI.SSVI_TF_d import SSVI_TF_d
 from SSVI.SSVI_TF_simple import SSVI_TF_simple
 
+import warnings
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+
 np.random.seed(seed=319)
 
 default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20, "k1" : 64, "k2" : 64}
@@ -22,8 +26,7 @@ def get_factorizer_param(model, datatype, diag):
     # TODO: what about robust and diag? do I need sigma_eta
     if model == "robust":
         return  {"eta" : 1, "cov_eta" : 1 if datatype == "real" else 0.001, "sigma_eta" : 0.01, \
-                 "unstable_cov" : (True if not diag else False) }
-
+                 "unstable_cov" : (True if not diag else False)}
     return None
 
 def get_init_values(datatype, D):
@@ -60,17 +63,16 @@ def do_learning_curve(factorizer, tensor, iter_num):
         factorizer.factorize(report=500, max_iteration=iter_num)
 
 def test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio):
-    model = "robust"
-    datatype = "real"
     D = 20
-
     tensor = synthesize_tensor(datatype, noise, noise_ratio)
     factorizer_param = get_factorizer_param(model, datatype, diag)
     init_vals = get_init_values(datatype, D)
     params = {**default_params, **factorizer_param, **init_vals, "tensor": tensor}
 
-    diag = False  # full or diagonal covariance
-    params["diag"] = diag
+    if diag:
+        params["diag"] = True
+    else:
+        params["diag"] = False
 
     if model == "deterministic":
         factorizer = SSVI_TF_d(**params)
@@ -88,8 +90,9 @@ parser.add_argument("-d", "--data", type=str, help="data types: binary, real or 
 parser.add_argument("-m", "--model", type=str, help="model: simple, deterministic or robust")
 parser.add_argument("--diag", action="store_true")
 parser.add_argument("-n", "--noise", type=float, help="noise level")
-parser.add_argument("-i", "--iter", type=int, help="number of iterations")
+parser.add_argument("-i", "--iteration", type=int, help="number of iterations")
 parser.add_argument("-r", "--ratio", action="store_true")
+parser.add_argument("-o", "--output", type=str, help="output folder")
 
 args = parser.parse_args()
 
@@ -97,9 +100,13 @@ datatype = args.data
 model    = args.model
 diag     = args.diag
 noise    = args.noise
-iter_num = args.iter
+iter_num = args.iteration
 noise_ratio = args.ratio
+outfolder   = args.output
 
+# output   = outfolder + "{}_{}_out.txt".format(model, datatype)
+# sys.stdout = open(output, "w")
+# sys.stdout.flush()
 
 if noise is None:
     noise = 0.1
@@ -111,6 +118,7 @@ if not noise_ratio:
         noise = 0.5
     elif datatype == "count":
         noise = 1
+    noise_ratio = False    
 
 if iter_num is None:
     iter_num = 6000
