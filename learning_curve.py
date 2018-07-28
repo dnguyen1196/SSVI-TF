@@ -91,8 +91,9 @@ parser.add_argument("-d", "--data", type=str, help="data types: binary, real or 
 parser.add_argument("-m", "--model", type=str, help="model: simple, deterministic or robust")
 parser.add_argument("--diag", action="store_true")
 parser.add_argument("-n", "--noise", type=float, help="noise level")
-parser.add_argument("-i", "--iter", type=int, help="number of iterations")
+parser.add_argument("-i", "--iteration", type=int, help="number of iterations")
 parser.add_argument("-r", "--ratio", action="store_true")
+parser.add_argument("-o", "--output", type=str, help="output folder")
 
 args = parser.parse_args()
 
@@ -100,9 +101,13 @@ datatype = args.data
 model    = args.model
 diag     = args.diag
 noise    = args.noise
-iter_num = args.iter
+iter_num = args.iteration
 noise_ratio = args.ratio
+outfolder   = args.output
 
+output   = outfolder + "{}_{}_out.txt".format(model, datatype)
+sys.stdout = open(output, "w")
+sys.stdout.flush()
 
 if noise is None:
     noise = 0.1
@@ -114,6 +119,7 @@ if not noise_ratio:
         noise = 0.5
     elif datatype == "count":
         noise = 1
+    noise_ratio = False    
 
 if iter_num is None:
     iter_num = 6000

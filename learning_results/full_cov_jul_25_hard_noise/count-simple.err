@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "learning_curve.py", line 130, in <module>
+    test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio)
+  File "learning_curve.py", line 86, in test_learning_curve
+    do_learning_curve(factorizer, tensor, iter_num)
+  File "learning_curve.py", line 64, in do_learning_curve
+    factorizer.factorize(report=500, max_iteration=iter_num)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 108, in factorize
+    self.update_natural_param_batch(dim, col)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 169, in update_natural_param_batch
+    S_next   = self.update_cov_param(dim, i, m, S, di, Di)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 281, in update_cov_param
+    S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
+  File "/cluster/home/mnguye16/.local/lib/python3.5/site-packages/numpy/linalg/linalg.py", line 528, in inv
+    ainv = _umath_linalg.inv(a, signature=signature, extobj=extobj)
+  File "/cluster/home/mnguye16/.local/lib/python3.5/site-packages/numpy/linalg/linalg.py", line 89, in _raise_linalgerror_singular
+    raise LinAlgError("Singular matrix")
+numpy.linalg.linalg.LinAlgError: Singular matrix
