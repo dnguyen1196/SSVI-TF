@@ -18,7 +18,7 @@ hard noise for binary -> 0.5
 hard noise for count -> 1
 
 # extra implementation
-
+- Output to specified files instead of waiting on stddout
 
 # diagonal covariance
 
@@ -35,9 +35,22 @@ and weird)
 
 
 
+binary deterministic
+count deterministic
+real simple
+binary simple
+count simple
+real robust
+binary robust
+count robust
 
 
+-p batch -c 2 --mem=4196 --time=4-00:00:00 --mail-type=ALL --mail-user=$USER --wrap="python learning_curve.py -d real -m deterministic" 
 
+
+full_cov_jul_25_hard_noise/
+full_cov_jul_25_no_noise/
+full_cov_jul_25_ratio_0.1/
 
 full_cov_jul_25_hard_noise
 full_cov_jul_20_noise_0.1  

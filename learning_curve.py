@@ -79,6 +79,7 @@ def test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio):
     elif model == "robust":
         factorizer = SSVI_TF_robust(**params)
 
+    factorizer.evaluate_true_params()
     do_learning_curve(factorizer, tensor, iter_num)
 
 

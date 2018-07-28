@@ -27,7 +27,9 @@ do
     else choose_ratio=""
     fi
 
-    sbatch $opts $outs --wrap="python learning_curve.py -d $data -m $model -n $noise $choose_diag $choose_ratio"
+    wrap="python learning_curve.py -d $data -m $model -n $noise $choose_diag $choose_ratio"
+    echo wrap
+    sbatch $opts $outs --wrap=$wrap
 
     sleep 1
 done
