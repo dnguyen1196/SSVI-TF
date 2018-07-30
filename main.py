@@ -1,7 +1,7 @@
 import sys
 import pickle
 import argparse
-from Tensor.Real_valued_tensor import RV_tensor
+from Tensor.real_tensor import RV_tensor
 from Tensor.binary_tensor import binary_tensor
 from Tensor.count_tensor import count_tensor
 import numpy as np

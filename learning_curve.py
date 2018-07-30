@@ -104,7 +104,7 @@ iter_num = args.iteration
 noise_ratio = args.ratio
 outfolder   = args.output
 
-# output   = outfolder + "{}_{}_out.txt".format(model, datatype)
+# output     = outfolder + "{}_{}_out.txt".format(model, datatype)
 # sys.stdout = open(output, "w")
 # sys.stdout.flush()
 
