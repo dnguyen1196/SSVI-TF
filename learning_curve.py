@@ -25,7 +25,7 @@ def get_factorizer_param(model, datatype, diag):
 
     # TODO: what about robust and diag? do I need sigma_eta
     if model == "robust":
-        return  {"eta" : 1, "cov_eta" : 1 if datatype == "real" else 0.001, "sigma_eta" : 0.01, \
+        return  {"eta" : 1, "cov_eta" : 0.01 if datatype == "real" else 0.001, "sigma_eta" : 0.01, \
                  "unstable_cov" : (True if not diag else False)}
     return None
 
@@ -104,9 +104,9 @@ iter_num = args.iteration
 noise_ratio = args.ratio
 outfolder   = args.output
 
-# output     = outfolder + "{}_{}_out.txt".format(model, datatype)
-# sys.stdout = open(output, "w")
-# sys.stdout.flush()
+output     = outfolder + "{}_{}_out.txt".format(model, datatype)
+sys.stdout = open(output, "w")
+sys.stdout.flush()
 
 if noise is None:
     noise = 0.1
