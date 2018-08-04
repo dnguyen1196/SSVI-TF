@@ -141,21 +141,6 @@ class SSVI_TF_robust(SSVI_TF):
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
-    def predict_entry(self, entry):
-        if self.likelihood_type == "normal":
-            u = np.ones((self.D,))
-            for dim, col in enumerate(entry):
-                m, _ = self.posterior.get_vector_distribution(dim, col)
-                u = np.multiply(u, m)
-            return np.sum(u)
-
-        res = self.estimate_expected_observation_via_sampling(entry)
-        if self.likelihood_type == "bernoulli":
-            return 1 if res > 1/2 else -1
-
-        elif self.likelihood_type == "poisson":
-            return res
-
     def update_sigma_param(self, si_acc, scale):
         # print(si_acc)
         # print("scale: ", scale)

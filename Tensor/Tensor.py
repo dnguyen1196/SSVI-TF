@@ -70,6 +70,7 @@ class Tensor(object):
         :param train_ratio:
         :return:
         """
+        print("Using ", train_ratio, "of training data")
         new_train_size = int(self.train * train_ratio * len(self.observed_vals))
 
         self.train_entries = self.observed_entries[: new_train_size]
