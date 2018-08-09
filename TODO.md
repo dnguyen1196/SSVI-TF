@@ -15,6 +15,7 @@ why -> decreasing cov_eta to 0.001 seems to be ok
     -> round int results for count prediction 
        
     -> Optimal choice of rate constants?
+       -> Higher eta for robust model leading to lower error -> does that mean the adagrad scheme causes too small step?
 
 - True model nll -> estimation with 
 
