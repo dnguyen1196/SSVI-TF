@@ -90,9 +90,11 @@ class SSVI_TF(object):
         self.d_mean = 1.
         self.d_cov  = 1.
 
-    def factorize(self, report=100, max_iteration=2000):
+    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False):
         self.report = report
         self.max_iteration = max_iteration
+        self.fixed_covariance = fixed_covariance
+        print("Factorizing with max_iteration =", max_iteration, " fixing covariance?: ", fixed_covariance)
 
         update_column_pointer = [0 for _ in range(self.order)]
         start = time.time()
@@ -179,8 +181,11 @@ class SSVI_TF(object):
             self.w_changes = np.abs(w_sigma - self.w_sigma)
             self.w_sigma   = w_sigma
 
+        # If chosen fixed covariance, skip updating covariance (test purpose)
+        if self.fixed_covariance:
+            S_next = S
+
         # Measures the change in the parameters from previous iterations
-        # print("dmean: ", np.linalg.norm(m_next - m), " dcov: ", np.linalg.norm(S_next - S, 'fro'))
         self.keep_track_changes_params(dim, i, m, S, m_next, S_next)
         # Update the change
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
@@ -484,7 +489,11 @@ class SSVI_TF(object):
             else:
                 w   = np.zeros((self.k1,))
             fs  = np.random.normal(ms, w, size=(self.k1, self.k1))
+                fs = np.random.normal(ms, w, size=(self.k1, self.k1))
+            else:
+                fs = ms
 
+            # fs  = np.random.normal(ms, w, size=(self.k1, self.k1))
             # expected_ll = np.mean(np.mean(self.likelihood.pdf(vals[i], fs, s), axis=0))
             expected_ll = np.mean(self.likelihood.pdf(vals[i], fs, s))
             nll -= np.log(expected_ll)
@@ -583,7 +592,7 @@ class SSVI_TF(object):
         else:
             res = self.estimate_expected_observation_via_sampling(entry)
             if self.likelihood_type == "bernoulli":
-                return 1 if res > 1/2 else -1
+                return 1 if res >= 1/2 else -1
             elif self.likelihood_type == "poisson":
                 return res
     """
@@ -737,13 +746,24 @@ class SSVI_TF(object):
         test_rsme, test_error = self.evaluate_true_hidden_vectors(self.tensor.test_entries, \
                                                                     self.tensor.test_vals, \
                                                                     self.tensor.matrices)
+
+        test_nll = self.evaluate_true_model_nll(self.tensor.test_entries,\
+                                                self.tensor.test_vals,\
+                                                self.tensor.matrices)
+
+        train_nll = self.evaluate_true_model_nll(self.tensor.train_entries,\
+                                                 self.tensor.train_vals,\
+                                                 self.tensor.matrices)
+
         print("Evaluation for true params: ")
-        print(" test_rsme | train_rsme | rel-te-err | rel-tr-err |")
-        print("{:^12} {:^12} {:^12} {:^12}".format(\
+        print(" test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |")
+        print("{:^12} {:^12} {:^12} {:^12} {:^12} {:^12}".format(\
             np.around(test_rsme, 10), \
             np.around(train_rsme, 10), \
             np.around(test_error, 10), \
-            np.around(train_error, 10)))
+            np.around(train_error, 10), \
+            np.around(test_nll, 2), \
+            np.around(train_nll, 2)))
 
     def evaluate_true_hidden_vectors(self, entries, vals, matrices):
         rsme = 0.0
@@ -795,3 +815,34 @@ class SSVI_TF(object):
         ps = self.link_fun(f_noised)
         p = np.mean(ps)
         return p
+<<<<<<< HEAD
+=======
+
+    def evaluate_true_model_nll(self, entries, vals, matrices):
+        nll  = 0.
+        dims = np.arange(len(self.dims))
+        s    = self.likelihood_param
+
+        for i in range(len(vals)):
+            ms = np.ones((self.tensor.D,))
+            for dim, col in enumerate(dims):
+                ms = np.multiply(ms, self.tensor.matrices[dim][col, :])
+
+            f = np.sum(ms)
+
+            if self.noise_added:
+                noise_ratio = self.tensor.noise_ratio
+                if noise_ratio:
+                    w = np.abs(f) * noise_ratio
+                else:
+                    w = self.tensor.noise
+
+                fs  = np.random.normal(f, w, size=(self.k1,))
+            else:
+                fs = f
+
+            expected_ll = np.mean(self.likelihood.pdf(vals[i], fs, s))
+            nll -= np.log(expected_ll)
+
+        return nll
+>>>>>>> 23eca854e7d197aebd8f7cba1e06328f4928f4f5

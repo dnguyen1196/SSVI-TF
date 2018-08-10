@@ -127,3 +127,10 @@ assert (datatype in ["binary", "real", "count"])
 assert (model in ["simple", "deterministic", "robust"])
 
 test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio)
+
+
+"""
+hard noise for real -> 500
+hard noise for binary -> 0.5
+hard noise for count -> 1
+"""
