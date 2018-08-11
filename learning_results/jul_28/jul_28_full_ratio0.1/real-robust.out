@@ -1,0 +1,6 @@
+Generating synthetic real valued data ... 
+Generating synthetic  real valued data took:  7.490726470947266
+Evaluation for true params: 
+ test_rsme | train_rsme | rel-te-err | rel-tr-err |
+1003.6956780829 1002.2577092699 0.0819115766 0.0815849494
+Using  0.01  of training data 
