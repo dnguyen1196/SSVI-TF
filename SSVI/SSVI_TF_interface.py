@@ -486,12 +486,9 @@ class SSVI_TF(object):
             ms  = np.sum(vs, axis=1) # shape (k1,)
             if self.noise_added:
                 w   = np.random.rayleigh(np.square(self.w_sigma), self.k1)
+                fs  = np.random.normal(np.full_like(w,ms), w, size=(self.k1, self.k1))
             else:
-                w   = np.zeros((self.k1,))
-            fs  = np.random.normal(ms, w, size=(self.k1, self.k1))
-                fs = np.random.normal(ms, w, size=(self.k1, self.k1))
-            else:
-                fs = ms
+                fs  = ms
 
             # fs  = np.random.normal(ms, w, size=(self.k1, self.k1))
             # expected_ll = np.mean(np.mean(self.likelihood.pdf(vals[i], fs, s), axis=0))
@@ -815,8 +812,6 @@ class SSVI_TF(object):
         ps = self.link_fun(f_noised)
         p = np.mean(ps)
         return p
-<<<<<<< HEAD
-=======
 
     def evaluate_true_model_nll(self, entries, vals, matrices):
         nll  = 0.
@@ -845,4 +840,3 @@ class SSVI_TF(object):
             nll -= np.log(expected_ll)
 
         return nll
->>>>>>> 23eca854e7d197aebd8f7cba1e06328f4928f4f5
