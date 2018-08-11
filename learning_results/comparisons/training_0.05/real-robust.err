@@ -1,0 +1,5 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py:396: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  vj_sample = np.random.multivariate_normal(mi, Si, size=k)
+/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py:40: RuntimeWarning: covariance is not symmetric positive-semidefinite.
+  uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
