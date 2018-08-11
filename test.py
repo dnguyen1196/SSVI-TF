@@ -21,9 +21,6 @@ def get_factorizer_param(model, datatype, diag):
 
     # TODO: what about robust and diag? do I need sigma_eta
     if model == "robust":
-<<<<<<< HEAD
-        return  {"eta" : 5, "cov_eta" : 1 if datatype == "real" else 0.001, "sigma_eta" : 0.01, \
-=======
         cov_eta = 1
         eta     = 1
         if datatype == "count":
@@ -33,8 +30,7 @@ def get_factorizer_param(model, datatype, diag):
             cov_eta = 0.001
             eta     = 1
 
-        return  {"eta" : eta, "cov_eta" : cov_eta, "sigma_eta" : 0.1, \
->>>>>>> 23eca854e7d197aebd8f7cba1e06328f4928f4f5
+        return  {"eta" : eta, "cov_eta" : cov_eta, "sigma_eta" : 1, \
                  "unstable_cov" : (True if not diag else False) }
 
     return None
@@ -61,7 +57,7 @@ def synthesize_tensor(datatype, NOISE_RATIO):
         tensor = count_tensor()
 
     NOISE = 0.1
-    if NOISE_RATIO:
+    if not NOISE_RATIO:
         if datatype == "real":
             NOISE = 500
         elif datatype == "binary":
@@ -74,18 +70,25 @@ def synthesize_tensor(datatype, NOISE_RATIO):
     return tensor
 
 
-<<<<<<< HEAD
-model    = "robust"
-=======
-model    = "simple"
->>>>>>> 23eca854e7d197aebd8f7cba1e06328f4928f4f5
-datatype = "binary"
+parser = argparse.ArgumentParser(description="Testing models at specific training size")
+parser.add_argument("-m", "--model", type=str, help="model of factorizer")
+parser.add_argument("-d", "--datatype", type=str, help="datatype of tensor")
+parser.add_argument("--diag", action="store_true")
+parser.add_argument("--ratio", action="store_true")
+parser.add_argument("-tr", "--train_size", type=float, help="portion of training data")
+
+args = parser.parse_args()
+
+model    = args.model
+datatype = args.datatype
+
 D        = 20
-diag = False # full or diagonal covariance
-NOISE_RATIO = False
-train_size  = 0.05
+diag = args.diag # full or diagonal covariance
+NOISE_RATIO = args.ratio # using noise as ratio of f?
+train_size  = args.diag
 default_params["diag"] = diag
-fixed_covariance = True
+
+fixed_covariance = False
 
 
 synthetic_tensor = synthesize_tensor(datatype, NOISE_RATIO)
@@ -93,15 +96,11 @@ factorizer_param = get_factorizer_param(model, datatype, diag)
 init_vals        = get_init_values(datatype, D)
 params           = {**default_params, **factorizer_param, **init_vals, "tensor" : synthetic_tensor }
 
-<<<<<<< HEAD
-params["eta"]    = 1
-params["sigma_eta"]  = 1
-=======
+
 if fixed_covariance: # Special option to test, keep a fixed covariance
     if datatype == "binary" or datatype == "count":
         params["cov0"] = np.eye(D) * 0.1
 
->>>>>>> 23eca854e7d197aebd8f7cba1e06328f4928f4f5
 
 if model == "deterministic":
     factorizer = SSVI_TF_d(**params)
@@ -110,16 +109,9 @@ elif model == "simple":
 elif model == "robust":
     factorizer = SSVI_TF_robust(**params)
 
-<<<<<<< HEAD
-synthetic_tensor.reduce_train_size(train_size)
-factorizer.evaluate_true_params()
-factorizer.factorize(report=100, max_iteration=2000)
 
-=======
-portion = 0.05
+portion = args.train_size
 
 factorizer.evaluate_true_params()
-
 synthetic_tensor.reduce_train_size(portion)
-factorizer.factorize(report=500, max_iteration=6000, fixed_covariance=fixed_covariance)
->>>>>>> 23eca854e7d197aebd8f7cba1e06328f4928f4f5
+factorizer.factorize(report=500, max_iteration=8000, fixed_covariance=fixed_covariance)
