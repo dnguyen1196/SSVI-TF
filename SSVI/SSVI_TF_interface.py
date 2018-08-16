@@ -90,8 +90,10 @@ class SSVI_TF(object):
         self.d_mean = 1.
         self.d_cov  = 1.
 
-    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False):
+    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False, to_report=[]):
         self.report = report
+        self.header_printed = False
+        self.to_report = to_report
         self.max_iteration = max_iteration
         self.fixed_covariance = fixed_covariance
         print("Factorizing with max_iteration =", max_iteration, " fixing covariance?: ", fixed_covariance)
@@ -119,7 +121,7 @@ class SSVI_TF(object):
                                              % self.dims[dim]
 
             mean_change, cov_change = self.check_stop_cond()
-            if iteration != 0 and iteration % self.report == 0:
+            if (iteration != 0 and iteration % self.report == 0) or iteration in to_report:
                 self.report_metrics(iteration, start, mean_change, cov_change)
 
             if max(mean_change, cov_change) < self.epsilon:
@@ -328,6 +330,7 @@ class SSVI_TF(object):
 
         else:
             raise Exception("Unidentified update formula for covariance param")
+        S_next = np.maximum(S_next, self.epsilon)
         return S_next
 
     def update_sigma_param(self, si_acc, scale):
@@ -404,7 +407,8 @@ class SSVI_TF(object):
     Functions to report metrics (error, vlb, etc)
     """
     def report_metrics(self, iteration, start, mean_change, cov_change):
-        if iteration == self.report:
+        if not self.header_printed and (iteration == self.report or (len(self.to_report) > 0 and iteration == self.to_report[0])):
+            self.header_printed = True
             print("Tensor dimensions: ", self.dims)
             print("Optimization metrics: ")
             if hasattr(self, "window_size"):
@@ -413,6 +417,7 @@ class SSVI_TF(object):
                 print("Using Ada Grad")
             print("Mean update scheme: ", self.mean_update)
             print("Covariance update : ", self.cov_update)
+            print("Using diagonal covariance?: ", self.diag)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
             print("iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  |", end=" ")

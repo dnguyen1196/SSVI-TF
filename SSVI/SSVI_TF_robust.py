@@ -7,7 +7,7 @@ class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                  diag=False, mean0=None, cov0=None, sigma0=1, \
                  unstable_cov=False, k1=64, k2=64, batch_size=128, \
-                 eta=1, cov_eta=0.001, sigma_eta=0.01):
+                 eta=1, cov_eta=0.001, sigma_eta=0.01, quadrature=True):
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
                  mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta)
@@ -16,6 +16,10 @@ class SSVI_TF_robust(SSVI_TF):
         self.w_sigma = 1.
         self.w_ada_grad = 0.
         self.noise_added = True
+        self.quadrature = quadrature
+        if quadrature:
+            self.gauss_degree = 30
+            self.xs, self.weights = np.polynomial.hermite.hermgauss(self.gauss_degree)
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
@@ -64,7 +68,10 @@ class SSVI_TF_robust(SSVI_TF):
         assert(self.k1 == np.size(mean_batch, axis=1))
 
         # All shapes are (num_samples, k1)
-        phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
+        if self.quadrature:
+            phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch_quadrature(ys, mean_batch, ws_batch)
+        else:
+            phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
 
         di = np.zeros((num_samples, self.D))
         if self.diag:
@@ -140,6 +147,47 @@ class SSVI_TF_robust(SSVI_TF):
     # TODO: implement closed form version if exists
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+
+    def estimate_expected_derivatives_pdf_batch_quadrature(self, ys, mean_batch, ws_batch):
+        """
+        :param ys: (num_samples)
+        :param mean_batch: (num_samples, k1)
+        :param ws_batch: (num_samples, k1)
+
+        return: approximation to the integral int(N(f|m,w) p(y|f))
+        """
+        num_samples = np.size(ys, axis=0)
+        pdf         = np.zeros((num_samples, self.k1))
+        fst_deriv   = np.zeros_like(pdf)
+        snd_deriv   = np.zeros_like(pdf)
+
+        s = self.likelihood_param
+        for num in range(num_samples):
+            ms = mean_batch[num, :] # shape = k1
+            ws = ws_batch[num, :]   # shape = k1
+            assert(ms.shape == (self.k1,))
+            assert(ws.shape == (self.k1,))
+            y  = ys[num]
+            for k in range(self.k1):
+                E_ps, E_fst, E_snd = self.estimate_expected_pdf_quadrature(y, ms[k], ws[k])
+                pdf[num, k] = E_ps
+                fst_deriv[num, k] = E_fst
+                snd_deriv[num, k] = E_snd
+
+        return pdf, fst_deriv, snd_deriv
+
+    def estimate_expected_pdf_quadrature(self, y, m, w):
+        s  = self.likelihood_param
+        fs = m + np.sqrt(2* np.square(w)) * self.xs # fs.shape = (gauss_degree)
+        # ps, ps_fst, ps_snd -> shape = (gauss_degree)
+        ps     = self.likelihood.pdf(y, fs, s)
+        ps_fst = self.likelihood.fst_derivative_pdf(y, fs, s)
+        ps_snd = self.likelihood.snd_derivative_pdf(y, fs, s)
+
+        E_ps = np.sum(self.weights * ps) / np.sqrt(np.pi)
+        E_fst = np.sum(self.weights * ps_fst) / np.sqrt(np.pi)
+        E_snd = np.sum(self.weights * ps_snd) / np.sqrt(np.pi)
+        return E_ps, E_fst, E_snd
 
     def update_sigma_param(self, si_acc, scale):
         # print(si_acc)

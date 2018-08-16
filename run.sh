@@ -21,7 +21,7 @@ do
     if [ "$diag" == "true" ]
     then choose_diag="--diag"
     fi
-    
+
     choose_ratio=""
     if [ "$ratio" == "true" ]
     then choose_ratio="--ratio"
