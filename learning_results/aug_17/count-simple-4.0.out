@@ -1,0 +1,48 @@
+Generating synthetic count valued data ... 
+Generating synthetic  count valued data took:  11.792688846588135
+max_count =  49  min count =  0
+Evaluation for true params: 
+ test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
+2.9746545037 2.9574624556 1.9297919746  1.91721489    91479.81    367436.95  
+Using  0.05 of training data
+Factorizing with max_iteration = 8000  fixing covariance?:  False
+Tensor dimensions:  [50, 50, 50]
+Optimization metrics: 
+Using Ada Grad
+Mean update scheme:  S
+Covariance update :  N
+Using diagonal covariance?:  True
+k1 samples =  64  k2 samples =  64
+eta =  1  cov eta =  1  sigma eta =  1
+iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  | test_nll | train_nll  |   dw   |
+    50       49.05      9.796      6.7076     9.5107     6.4604     3.1623     1.8306    89283.58   16696.78    0.0004  
+   100       219.93     8.659      6.1626     7.1028     5.0265     3.1491     0.7264    69065.48   12004.68     0.0    
+   200       439.09    63.0418     42.328    83.9755    59.9748     2.9258     0.2606   183107.96   45661.69     0.0    
+   500       847.74      inf        inf        inf        inf       2.5084     0.0799      nan        nan        0.0    
+   1000     1414.02      inf        inf        inf        inf       1.9688     0.0428      nan        nan        0.0    
+   1500      1972.7      inf        inf        inf        inf       1.6598     0.0298      nan        nan        0.0    
+   2000     2530.18      inf        inf        inf        inf       1.4167     0.0349      nan        nan        0.0    
+   2500     3085.87      inf        inf        inf        inf       1.4984     0.0139      nan        nan        0.0    
+   3000     3638.22      inf        inf        inf        inf       1.3618     0.0345      nan        nan        0.0    
+   3500     4190.54      inf        inf        inf        inf       1.1017     0.0107      nan        nan        0.0    
+   4000     4742.84      inf        inf        inf        inf       1.0219     0.0071      nan        nan        0.0    
+   4500     5295.28      inf        inf        inf        inf       0.9836     0.0081      nan        nan        0.0    
+   5000     5847.87      inf        inf        inf        inf       0.902      0.0166      nan        nan        0.0    
+   5500     6400.58      inf        inf        inf        inf       0.9018     0.0112      nan        nan        0.0    
+   6000     6953.31      inf        inf        inf        inf       0.8753     0.0035      nan        nan        0.0    
+   6500     7506.16      inf        inf        inf        inf       0.8237     0.0036      nan        nan        0.0    
+   7000     8059.15      inf        inf        inf        inf       0.8487     0.0103      nan        nan        0.0    
+   7500     8612.27      inf        inf        inf        inf       0.7602     0.0081      nan        nan        0.0    
+   8000     9165.41      inf        inf        inf        inf       0.765      0.025       nan        nan        0.0    
+[ 40.5750676   42.85824683 -40.32142754  41.20371957  41.30242021
+  39.41849265  38.83309448 -40.58265605 -40.47514989 -39.15121076
+ -22.76425151  10.51684462  39.11549732  37.97255876  38.6618493
+  13.10998542  40.60234197 -40.02342893 -38.91913672 -29.34465823]
+[ 42.71222673 -43.20493356  39.69063945  41.20721265  41.25721135
+  41.98487012  40.15564698 -43.60620318 -39.13431381  41.37310017
+  42.19338263  41.9682904  -38.09277612 -41.24448727 -40.96588379
+  40.87249498  41.43206809 -41.28157493  40.71068498  26.77264843]
+[ 42.05866206 -41.47854744 -39.0572462   40.86309483  40.79688042
+ -41.32148742  40.83468623  26.78001164  37.718151   -40.280632
+ -37.14382942 -39.4843565  -33.76883355  40.76975547 -40.97215244
+  38.95338429  39.53500503  41.0331268   41.64994113  41.96363343]
