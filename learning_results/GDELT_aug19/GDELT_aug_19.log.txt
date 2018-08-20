@@ -1,0 +1,11 @@
+min_count: 1
+max_count: 863
+Factorizing with max_iteration = 6000  fixing covariance?:  False
+Tensor dimension: [53, 13438, 13438, 253]
+Mean update: S
+Cov update: N
+Using diagonal covariance: False
+k1 samples =  64  k2 samples =  64
+eta =  1  cov eta =  0.001  sigma eta =  1
+iteration |   time   |test_rsme|  d_mean  |   d_cov  |
+   100      2207.29   3.30490726009871    0.5       6.5432  
