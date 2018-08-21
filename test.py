@@ -61,14 +61,6 @@ def synthesize_tensor(datatype, NOISE_RATIO, NOISE_AMOUNT):
         tensor = count_tensor()
 
     """
-    NOISE = 0.1
-    if not NOISE_RATIO:
-        if datatype == "real":
-            NOISE = 500
-        elif datatype == "binary":
-            NOISE = 0.5
-        else:
-            NOISE = 0.1
     """
     if NOISE_AMOUNT is not None:
         using_ratio = False
@@ -83,6 +75,22 @@ def synthesize_tensor(datatype, NOISE_RATIO, NOISE_AMOUNT):
     tensor.synthesize_data(dims, means, covariances, real_dim, \
                            train=0.8, sparsity=1, noise=noise, noise_ratio=using_ratio)
     return tensor
+
+def synthesize_matrix(datatype, noise_ratio, noise_amount):
+    dims = [100, 100]
+    real_dim = 100
+    means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 2]
+    covariances = [np.eye(real_dim) * 2, np.eye(real_dim) * 3]
+
+    if datatype == "binary":
+        tensor = binary_tensor()
+    elif datatype == "real":
+        tensor = RV_tensor()
+    else:
+        tensor = count_tensor()
+
+    tensor.synthesize_data(dims, means, covariances, real_dim, \
+                           train=0.8, sparsity=1, noise=noise_amount, noise_ratio=noise_ratio)
 
 
 parser = argparse.ArgumentParser(description="Testing models at specific training size")
@@ -99,6 +107,8 @@ parser.add_argument("--fixed_cov", action="store_true", help="Fixed covariance")
 parser.add_argument("-it", "--num_iters", type=int, help="Max number of iterations", default=8000)
 parser.add_argument("-re", "--report", type=int, help="Report interval", default=500)
 parser.add_argument("--quadrature", action="store_true", help="using quadrature")
+parser.add_argument("--matrix", action="store_true", help="Doing matrix factorization instead of tensor factorization")
+
 
 args = parser.parse_args()
 
@@ -114,7 +124,20 @@ default_params["diag"] = diag
 fixed_covariance = args.fixed_cov
 using_quadrature = args.quadrature
 
-synthetic_tensor = synthesize_tensor(datatype, NOISE_RATIO, NOISE_AMOUNT)
+if NOISE_RATIO is not None:
+    NOISE_RATIO = True
+    NOISE_AMOUNT = args.ratio
+elif NOISE_AMOUNT is not None:
+    NOISE_RATIO = False
+    NOISE_AMOUNT = args.noise
+else:
+    assert(False) # Fail immediately
+
+if args.matrix:
+    synthetic_tensor = synthesize_tensor(datatype, NOISE_RATIO, NOISE_AMOUNT)
+else:
+    synthetic_tensor = synthesize_matrix(datatype, NOISE_RATIO, NOISE_AMOUNT)
+
 factorizer_param = get_factorizer_param(model, datatype, diag, using_quadrature)
 init_vals        = get_init_values(datatype, D)
 params           = {**default_params, **factorizer_param, **init_vals, "tensor" : synthetic_tensor }
