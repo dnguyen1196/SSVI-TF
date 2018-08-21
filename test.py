@@ -26,7 +26,7 @@ def get_factorizer_param(model, datatype, diag, using_quadrature):
             set_params["cov_eta"] = 0.001
 
     elif diag and datatype != "real":
-        set_params["cov_eta"] = 0.001
+        set_params["cov_eta"] = 0.1
 
     return set_params
 
@@ -146,7 +146,11 @@ factorizer.evaluate_true_params()
 if portion is not None:
     synthetic_tensor.reduce_train_size(portion)
 
-factorizer.factorize(report=args.report, max_iteration=args.num_iters, fixed_covariance=fixed_covariance, to_report=[50, 100, 200])
+max_iterations = args.num_iters
+if datatype == "count":
+    max_iterations = 16000
+
+factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[50, 100, 200])
 
 v1, _ = factorizer.posterior.get_vector_distribution(0, 1)
 v2, _ = factorizer.posterior.get_vector_distribution(1, 10)
