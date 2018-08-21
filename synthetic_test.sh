@@ -7,7 +7,7 @@ read outdir # output directory
 
 echo "Output directory: $outdir"
 
-script="./venv/bin/python -u test.py --diag --fixed_cov -tr 0.05"
+script="./venv/bin/python -u test.py --diag --matrix"
 
 while IFS=' ' read -r data model noise
 do
