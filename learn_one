@@ -1,13 +1,7 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/full_cov_jul_25_hard_noise/
-false
-0.0
-false
-real deterministic
-binary deterministic
-count deterministic
-real simple
-binary simple
-count simple
-real robust
-binary robust
-count robust
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_21_updated/tensor_fixed_0.05/
+binary simple 1.0
+binary robust 1.0
+binary deterministic 1.0
+count simple 4.0
+count robust 4.0
+count deterministic 4.0

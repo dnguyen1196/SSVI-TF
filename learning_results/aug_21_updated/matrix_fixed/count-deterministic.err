@@ -1,0 +1,9 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "test.py", line 135, in <module>
+    factorizer = SSVI_TF_d(**params)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_d.py", line 13, in __init__
+    mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 24, in __init__
+    self.dims   = tensor.dims
+AttributeError: 'NoneType' object has no attribute 'dims'

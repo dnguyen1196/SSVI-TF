@@ -1,0 +1,16 @@
+Generating synthetic binary valued data ... 
+Generating synthetic  binary valued data took:  9.99657154083252
+Evaluation for true params: 
+ test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
+0.5752216964 0.5837122579   0.08272      0.08518      24762.13     98334.13  
+Factorizing with max_iteration = 8000  fixing covariance?:  False
+Tensor dimensions:  [50, 50, 50]
+Optimization metrics: 
+Using Ada Grad
+Mean update scheme:  S
+Covariance update :  N
+Using diagonal covariance?:  True
+k1 samples =  64  k2 samples =  64
+eta =  1  cov eta =  0.001  sigma eta =  1
+iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  | test_nll | train_nll  
+    50       54.34      1.3595     0.4621     1.3489     0.4549     3.1623     1.826     17642.46   70001.36  

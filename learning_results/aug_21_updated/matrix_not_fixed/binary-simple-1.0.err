@@ -1,0 +1,7 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "test.py", line 153, in <module>
+    v3, _ = factorizer.posterior.get_vector_distribution(2, 30)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Model/TF_Models.py", line 73, in get_vector_distribution
+    return self.params[dim][i, 0, :], self.params[dim][i, 1, :]
+IndexError: list index out of range

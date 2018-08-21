@@ -1,0 +1,6 @@
+Generating synthetic binary valued data ... 
+Generating synthetic  binary valued data took:  10.40413498878479
+Evaluation for true params: 
+ test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
+0.5752216964 0.5837122579   0.08272      0.08518      22932.17     91132.68  
+Factorizing with max_iteration = 8000  fixing covariance?:  True
