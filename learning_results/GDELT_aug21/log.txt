@@ -8,3 +8,4 @@ Using diagonal covariance: True
 k1 samples =  64  k2 samples =  64
 eta =  1  cov eta =  0.001  sigma eta =  1
 iteration |   time   |test_rsme|  d_mean  |   d_cov  |
+    10       169.72   3.3454073226490433    0.5       0.4669  
