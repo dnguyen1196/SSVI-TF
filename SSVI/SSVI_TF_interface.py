@@ -90,12 +90,15 @@ class SSVI_TF(object):
         self.d_mean = 1.
         self.d_cov  = 1.
 
-    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False, to_report=[]):
+    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False, to_report=[], detailed_report=True):
         self.report = report
         self.header_printed = False
         self.to_report = to_report
         self.max_iteration = max_iteration
         self.fixed_covariance = fixed_covariance
+        self.missing = {}
+        self.max_changes = [[0, 0] for _ in self.dims]
+
         print("Factorizing with max_iteration =", max_iteration, " fixing covariance?: ", fixed_covariance)
 
         update_column_pointer = [0 for _ in range(self.order)]
@@ -116,13 +119,21 @@ class SSVI_TF(object):
             for dim in range(self.order):
                 if (update_column_pointer[dim] + 1 == self.dims[dim]):
                     self.time_step[dim] += 1  # increase time step
+                    self.max_changes[dim] = [0,0] # Reset max_changes
 
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.dims[dim]
 
             mean_change, cov_change = self.check_stop_cond()
+            #mean_change = max(x[0] for x in self.max_changes)
+            #cov_change  = max(x[1] for x  in self.max_changes)
+            #print(mean_change, cov_change)
+
             if (iteration != 0 and iteration % self.report == 0) or iteration in to_report:
-                self.report_metrics(iteration, start, mean_change, cov_change)
+                if detailed_report:
+                    self.report_metrics(iteration, start, mean_change, cov_change)
+                else:
+                    self.report_metrics_mini(iteration, start, mean_change, cov_change)
 
             if max(mean_change, cov_change) < self.epsilon:
                 break
@@ -145,6 +156,10 @@ class SSVI_TF(object):
 
     def update_natural_param_batch(self, dim, i):
         observed = self.tensor.find_observed_ui(dim, i)
+
+        if len(observed) == 0: # If there is no data associated with the column
+            self.missing[(dim, i)] = True
+            return
 
         if len(observed) > self.batch_size:
             observed_idx = np.random.choice(len(observed), self.batch_size, replace=False)
@@ -382,6 +397,9 @@ class SSVI_TF(object):
         else:
             cov_change  = np.linalg.norm(S_next - S)
         self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
+        #d_mean = self.max_changes[dim][0]
+        #d_cov = self.max_changes[dim][1]
+        #self.max_changes[dim] = [max(d_mean, mean_change), max(d_cov, cov_change)]
 
     def sample_vjs_batch(self, cols_batch, dims_batch, k):
         num_subsamples = np.size(cols_batch, axis=0)
@@ -456,6 +474,30 @@ class SSVI_TF(object):
             print('{:^10}'.format(np.around(self.w_changes, dec)))
         else:
             print("")
+
+    def report_metrics_mini(self, iteration, start, mean_change, cov_change):
+        if not self.header_printed and (iteration == self.report or (len(self.to_report) > 0 and iteration == self.to_report[0])):
+            self.header_printed = True
+            print("Tensor dimension:", self.dims)
+            print("Mean update:", self.mean_update)
+            print("Cov update:", self.cov_update)
+            print("Using diagonal covariance:", self.diag)
+            print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
+            print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
+
+            #print("iteration |   time   |test_rsme |train_rsme|  d_mean  |   d_cov  |")
+
+            print("iteration |   time   |test_rsme|  d_mean  |   d_cov  |")
+
+            current = time.time()
+            dec = 4
+
+            #rsme_train, error_train = self.evaluate_train_error()
+            rsme_test, error_test   = self.evaluate_test_error()
+
+            #print("{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current - start,2), rsme_test, rsme_train, np.around(mean_change, dec), np.around(cov_change, dec)))
+            print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), rsme_test, np.around(mean_change, dec), np.around(cov_change, dec)))
+
 
     def estimate_vlb(self, entries, values):
         raise NotImplementedError
@@ -551,11 +593,29 @@ class SSVI_TF(object):
         return error/len(entries)
 
     def evaluate_RSME(self, entries, vals):
+        """
+        TODO: Have option to do average?
+        """
+
         rsme = 0.0
         error = 0.0
+        num_entries = len(vals)
 
         for i in range(len(entries)):
-            predict = self.predict_entry(entries[i])
+            entry = entries[i]
+            missing_col = False
+
+            for dim, col in enumerate(entry):
+                # If the entry involve an unlearned column, flag it
+                if (dim, col) in self.missing:
+                    num_entries -= 1
+                    missing_col = True
+                    break
+
+            if missing_col:
+                continue # Skip entries that involve unlearned column
+
+            predict = self.predict_entry(entry)
             correct = vals[i]
             rsme += np.square(predict - correct)
 
@@ -566,8 +626,8 @@ class SSVI_TF(object):
             elif self.likelihood_type == "poisson":
                 error += np.abs(predict - correct)
 
-        rsme = np.sqrt(rsme/len(vals))
-        error = error/len(vals)
+        rsme = np.sqrt(rsme/num_entries)
+        error = error/num_entries
         return rsme, error
 
     """

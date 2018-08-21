@@ -19,6 +19,72 @@ class Tensor(object):
 
         self.datatype = datatype
 
+
+    def read_from_file(self, filename, train_size, validation_size, test_size):
+        """
+        Read through the file
+        into entries and then shuffle
+        then choose train-test split
+        """
+        assert(validation_size + train_size + test_size == 1)
+
+        f = open(filename, "r")
+        headerread = False
+
+        entries = []
+        vals    = []
+        for line in f:
+            if not headerread:
+                headerread = True
+                dimensions = line.strip().split(",")
+                self.dims  = [int(x) for x in dimensions]
+                self.num_dimensions  = len(dimensions)
+                continue
+
+            data = line.strip().split(",")
+            coord = [int(x) for x in data[:-1]]
+            val   = float(data[-1])
+
+            if self.datatype == "count":
+                self.min_count = min(self.min_count, int(val))
+                self.max_count = max(self.max_count, int(val))
+
+            entries.append(coord)
+            vals.append(val)
+
+        # Generate random indices on this entries
+        total_numentries = len(entries)
+        train_num = int(total_numentries * train_size)
+        valid_num = int(total_numentries * validation_size)
+        test_num  = total_numentries - train_num - valid_num
+
+        indices = np.arange(total_numentries)
+        np.random.shuffle(indices)
+
+        train_indices = indices[:train_num]
+        valid_indices = indices[train_num : train_num + valid_num]
+        test_indices  = indices[train_num + valid_num :]
+
+        self.train_entries = np.take(entries, train_indices, axis=0)
+        self.train_vals = np.take(vals, train_indices, axis=0)
+
+        self.valid_entries = np.take(entries, valid_indices, axis=0)
+        self.valid_vals = np.take(vals, valid_indices, axis=0)
+
+        self.test_entries  = np.take(entries, test_indices, axis=0)
+        self.test_vals = np.take(vals, test_indices, axis=0)
+
+
+        self.observed_by_id = [[[] for _ in range(x)] for x in self.dims]
+
+        for i in range(len(self.train_entries)):
+            val = self.train_vals[i]
+            coord = self.train_entries[i]
+            #print("coord", coord)
+            for dim, col in enumerate(coord):
+                self.observed_by_id[dim][col].append((coord, val))
+
+
     """
     """
     def synthesize_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=0.1, noise_ratio=True):
@@ -340,8 +406,8 @@ class Tensor(object):
 
     def load_data(self, filename):
         """
-        :param filename: 
-        :return: 
+        :param filename:
+        :return:
         """
         # TODO: implement when testing on real life datasets
         pass
