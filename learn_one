@@ -1,7 +1,4 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_21_updated/tensor_fixed_0.05/
-binary simple 1.0
-binary robust 1.0
-binary deterministic 1.0
-count simple 4.0
-count robust 4.0
-count deterministic 4.0
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_21_updated/matrix_not_fixed/binary_4.0/
+binary simple 4.0
+binary robust 4.0
+binary deterministic 4.0
