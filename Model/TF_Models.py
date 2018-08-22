@@ -40,14 +40,19 @@ class Posterior(object):
 
 
 class Posterior_Full_Covariance(Posterior):
-    def __init__(self, dims, D, initMean=None, initCov=None):
+    def __init__(self, dims, D, initMean=None, initCov=None, randstart=True):
+        self.randstart = randstart
         super(Posterior_Full_Covariance, self).__init__(dims, D, initMean, initCov)
 
     def initialize_params(self, nparams, mean, cov):
         matrices = np.zeros((nparams, self.D + 1, self.D))
         for i in range(nparams):
-            matrices[i, 0, :]   = np.copy(mean)
-            matrices[i, 1 :, :] = np.copy(cov)
+            if not self.randstart:
+                matrices[i, 0, :]   = np.copy(mean)
+                matrices[i, 1 :, :] = np.copy(cov)
+            else:
+                matrices[i, 0, :]   = np.random.multivariate_normal(mean, np.eye(self.D))
+                matrices[i, 1 :, :]   = np.copy(cov)
         return matrices
 
     def get_vector_distribution(self, dim, i):
@@ -59,14 +64,19 @@ class Posterior_Full_Covariance(Posterior):
 
 
 class Posterior_Diag_Covariance(Posterior):
-    def __init__(self, dims, D, initMean=None, initCov=None):
+    def __init__(self, dims, D, initMean=None, initCov=None, randstart=True):
+        self.randstart = randstart
         super(Posterior_Diag_Covariance, self).__init__(dims, D, initMean, initCov)
 
     def initialize_params(self, nparams, mean, cov):
         matrices = np.zeros((nparams, 2, self.D))
         for i in range(nparams):
-            matrices[i, 0, :]  = np.copy(mean)
-            matrices[i, 1, :]  = np.copy(np.diag(cov))
+            if not self.randstart:
+                matrices[i, 0, :]  = np.copy(mean)
+                matrices[i, 1, :]  = np.copy(np.diag(cov))
+            else:
+                matrices[i, 0, :] = np.random.multivariate_normal(mean, np.eye(self.D))
+                matrices[i, 1, :] = np.copy(np.diag(cov))
         return matrices
 
     def get_vector_distribution(self, dim, i):

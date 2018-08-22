@@ -7,10 +7,10 @@ class SSVI_TF_simple(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                  diag=False, mean0=None, cov0=None, sigma0=1, \
                  unstable_cov=False, k1=64, k2=64, batch_size=128, \
-                 eta=1, cov_eta=1, sigma_eta=1):
+                 eta=1, cov_eta=1, sigma_eta=1, randstart=True):
 
         super(SSVI_TF_simple, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
-                 mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta)
+                 mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta, randstart)
 
         self.w_tau = 1.
         self.w_sigma = 1.

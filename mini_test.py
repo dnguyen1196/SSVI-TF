@@ -16,30 +16,24 @@ np.random.seed(seed=319)
 default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20, "k1" : 64, "k2" : 64}
 
 def get_factorizer_param(model, datatype, diag, using_quadrature):
-    set_params = {"eta" : 1, "cov_eta": 1}
-
-    # TODO: what about robust and diag? do I need sigma_eta
-    if model == "robust":
-        if diag:
-            set_params["cov_eta"] = 0.01
-        else:
-            set_params["cov_eta"] = 0.001
-
-    elif diag and datatype != "real":
-        set_params["cov_eta"] = 0.1
-
+    set_params = {"eta" : 1, "cov_eta": 0.001}
+    # Keep it consistent across all models
     return set_params
 
 def get_init_values(datatype, D):
     cov0 = np.eye(D)
     if datatype == "real":
         mean0 = np.ones((D,))
-    else:
+    elif datatype == "binary":
         mean0 = np.zeros((D,))
+    else:
+        mean0 = np.ones((D,)) * 0.1
     return {"cov0" : cov0, "mean0" : mean0}
 
 def synthesize_tensor(datatype, using_ratio, noise):
+    #dims = [50, 50, 50] # minitest so a small tensor
     dims = [50, 50, 50]
+    #dims = [25, 25, 25]
     real_dim = 100
     means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 10, np.ones((real_dim,)) * 2]
     covariances = [np.eye(real_dim) * 2, np.eye(real_dim) * 3, np.eye(real_dim) * 2]
@@ -53,13 +47,12 @@ def synthesize_tensor(datatype, using_ratio, noise):
 
     """
     """
-
     tensor.synthesize_data(dims, means, covariances, real_dim, \
                            train=0.8, sparsity=1, noise=noise, noise_ratio=using_ratio)
     return tensor
 
 def synthesize_matrix(datatype, noise_ratio, noise_amount):
-    dims = [100, 100]
+    dims = [20, 20]
     real_dim = 100
     means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 2]
     covariances = [np.eye(real_dim) * 2, np.eye(real_dim) * 3]
@@ -91,6 +84,8 @@ parser.add_argument("-it", "--num_iters", type=int, help="Max number of iteratio
 parser.add_argument("-re", "--report", type=int, help="Report interval", default=500)
 parser.add_argument("--quadrature", action="store_true", help="using quadrature")
 parser.add_argument("--matrix", action="store_true", help="Doing matrix factorization instead of tensor factorization")
+parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta")
+parser.add_argument("--rand", action="store_true", help="Using random start")
 
 
 args = parser.parse_args()
@@ -107,6 +102,8 @@ NOISE_AMOUNT = args.noise # Noise amount
 default_params["diag"] = diag
 fixed_covariance = args.fixed_cov
 using_quadrature = args.quadrature
+randstart = args.rand
+
 
 if NOISE_RATIO is not None:
     using_ratio = True
@@ -125,17 +122,19 @@ else:
 
 factorizer_param = get_factorizer_param(model, datatype, diag, using_quadrature)
 init_vals        = get_init_values(datatype, D)
+
 params           = {**default_params, **factorizer_param, **init_vals, "tensor" : synthetic_tensor }
 
-# Manually set the cov_eta
-params["cov_eta"] = 0.001 # To comment out after experiments
+if args.cov_eta is not None:
+    params["cov_eta"] = args.cov_eta
 
+params["randstart"] = randstart
 
 if fixed_covariance: # Special option to test, keep a fixed covariance
     if datatype == "binary" or datatype == "count":
         params["cov0"] = np.eye(D) * 0.1
 
-params["randstart"] = args.rand
+
 
 if model == "deterministic":
     factorizer = SSVI_TF_d(**params)
@@ -157,7 +156,7 @@ if datatype == "count" and model != "robust" and args.matrix:
 if datatype =="count" and not args.matrix:
     max_iterations = 10000
 
-factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[50, 100, 200])
+factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 10, 20,  50, 100, 200])
 
 v1, _ = factorizer.posterior.get_vector_distribution(0, 1)
 v2, _ = factorizer.posterior.get_vector_distribution(1, 10)
@@ -165,4 +164,3 @@ v3, _ = factorizer.posterior.get_vector_distribution(2, 30)
 print(v1)
 print(v2)
 print(v3)
-

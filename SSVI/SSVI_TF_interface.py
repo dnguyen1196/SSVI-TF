@@ -18,13 +18,13 @@ class SSVI_TF(object):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                         diag=False, mean0=None, cov0=None, sigma0=1,\
                         unstable_cov=False, k1=64, k2=64, batch_size=128, \
-                        eta=1, cov_eta=1, sigma_eta=1):
+                        eta=1, cov_eta=1, sigma_eta=1, randstart=True):
 
         self.tensor = tensor
         self.dims   = tensor.dims
         self.datatype   = tensor.datatype
         self.order      = len(tensor.dims)   # number of dimensions
-
+        self.randstart  = randstart
         self.D      = rank
         self.mean_update = mean_update
         self.cov_update  = cov_update
@@ -32,9 +32,9 @@ class SSVI_TF(object):
 
         self.diag = diag
         if not diag:
-            self.posterior        = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0)
+            self.posterior        = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0, randstart)
         else:
-            self.posterior        = Posterior_Diag_Covariance(self.dims, self.D, mean0, cov0)
+            self.posterior        = Posterior_Diag_Covariance(self.dims, self.D, mean0, cov0, randstart)
             self.ada_acc_grad_cov = [np.zeros((self.D, s)) for s in self.dims]
 
         self.mean0    = mean0
@@ -436,6 +436,7 @@ class SSVI_TF(object):
             print("Mean update scheme: ", self.mean_update)
             print("Covariance update : ", self.cov_update)
             print("Using diagonal covariance?: ", self.diag)
+            print("Random start?", self.randstart)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
             print("iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  |", end=" ")
@@ -656,7 +657,7 @@ class SSVI_TF(object):
             if self.likelihood_type == "bernoulli":
                 return 1 if res >= 1/2 else -1
             elif self.likelihood_type == "poisson":
-                return res
+                return np.rint(res)
     """
     Bridge function
     """
@@ -876,7 +877,8 @@ class SSVI_TF(object):
         f_noised = np.add(f, ws)
         ps = self.link_fun(f_noised)
         p = np.mean(ps)
-        return p
+        #return p
+        return np.rint(p)
 
     def evaluate_true_model_nll(self, entries, vals, matrices):
         nll  = 0.
