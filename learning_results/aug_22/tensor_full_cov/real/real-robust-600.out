@@ -1,8 +1,9 @@
 Generating synthetic real valued data ... 
-Generating synthetic  real valued data took:  9.712592601776123
+Generating synthetic  real valued data took:  15.820337295532227
 Evaluation for true params: 
  test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
 602.0920404727 601.2073392596 0.0489757024 0.0488317056  276684.61    1107079.51 
+Using  0.05 of training data
 Factorizing with max_iteration = 8000  fixing covariance?:  False
 Tensor dimensions:  [50, 50, 50]
 Optimization metrics: 
@@ -13,3 +14,9 @@ Using diagonal covariance?:  False
 k1 samples =  64  k2 samples =  64
 eta =  1  cov eta =  0.001  sigma eta =  0.01
 iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  | test_nll | train_nll  |   dw   |
+    50       780.23   9913.1123    0.9897   9925.3547    0.9897     3.1623     4.5086   287823.14   57564.63     0.0    
+   100      1633.84    9741.144    0.9721   9753.3628    0.9721     3.0691     2.3581   287823.14   57564.63     0.0    
+   200      3216.21   9045.7755    0.9011   9057.9478    0.9012     2.8061      0.0     287823.14   57564.63     0.0    
+   500      7813.01   4344.9682    0.4182   4357.0359    0.4189     1.896       0.0     287823.14   57564.63     0.0    
+   1000     15405.5    728.2296    0.0586    718.8322    0.0578     0.3559      0.0     286034.13   57188.59     0.0    
+   1500     22959.3    659.3767    0.0537    642.9262    0.0524     0.0959      0.0      285906.8   57248.15     0.0    

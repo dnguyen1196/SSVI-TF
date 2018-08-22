@@ -9,7 +9,12 @@ echo "Output directory: $outdir"
 
 # NOTE!!!!
 # Depending on the type of experiments change this
-script="./venv/bin/python -u test.py "
+script="./venv/bin/python -u test.py -tr 0.05"
+
+# NOTE: TRAIN SIZE
+# NOTE; --matrix
+# NOTE: --fixed cov
+# NOTE: --diag
 
 while IFS=' ' read -r data model noise
 do

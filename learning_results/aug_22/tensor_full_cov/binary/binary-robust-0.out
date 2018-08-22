@@ -1,8 +1,9 @@
 Generating synthetic binary valued data ... 
-Generating synthetic  binary valued data took:  8.326972484588623
+Generating synthetic  binary valued data took:  8.52651047706604
 Evaluation for true params: 
  test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
     0.0          0.0          0.0          0.0        24824.84     98569.99  
+Using  0.05 of training data
 Factorizing with max_iteration = 8000  fixing covariance?:  False
 Tensor dimensions:  [50, 50, 50]
 Optimization metrics: 
@@ -13,3 +14,14 @@ Using diagonal covariance?:  False
 k1 samples =  64  k2 samples =  64
 eta =  1  cov eta =  0.001  sigma eta =  0.01
 iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  | test_nll | train_nll  |   dw   |
+    50       349.93     1.0089     0.2545     0.9875     0.2438     3.1623     0.0512    13721.15   2712.39      0.0    
+   100       881.77      0.8        0.16      0.7869     0.1548     3.1599     0.0245    9153.79    1731.19      0.0    
+   200      1763.46     0.7474     0.1396     0.7652     0.1464     2.5766     0.0158    8036.88    1576.18      0.0    
+   500      4057.48     0.7364     0.1356     0.7327     0.1342     1.6076     0.0073    7785.83    1530.26      0.0    
+   1000     7763.93     0.7211      0.13      0.7321     0.134      0.8878     0.0042     7720.9    1524.85      0.0    
+   1500     11389.52    0.7289     0.1328     0.7299     0.1332     0.6764     0.0028    7733.16    1538.85      0.0    
+   2000     14929.48    0.7228     0.1306     0.7305     0.1334     0.6413     0.0023    7723.16    1519.66      0.0    
+   2500     18440.95    0.7258     0.1317     0.7272     0.1322     0.5888     0.0018    7735.57    1525.33      0.0    
+   3000     21950.92    0.7333     0.1344     0.7403     0.137      0.5784     0.0015    7753.45    1538.87      0.0    
+   3500     25457.14    0.7294     0.133      0.7381     0.1362     0.4791     0.0013    7796.62    1539.35      0.0    
+   4000     29037.22    0.7239     0.131      0.7354     0.1352     0.5193     0.0011    7756.63    1530.07      0.0    
