@@ -127,6 +127,9 @@ factorizer_param = get_factorizer_param(model, datatype, diag, using_quadrature)
 init_vals        = get_init_values(datatype, D)
 params           = {**default_params, **factorizer_param, **init_vals, "tensor" : synthetic_tensor }
 
+# Manually set the cov_eta
+params["cov_eta"] = 0.001 # To comment out after experiments
+
 
 if fixed_covariance: # Special option to test, keep a fixed covariance
     if datatype == "binary" or datatype == "count":
@@ -140,15 +143,17 @@ elif model == "robust":
     factorizer = SSVI_TF_robust(**params)
 
 portion = args.train_size
-
 factorizer.evaluate_true_params()
 
 if portion is not None:
     synthetic_tensor.reduce_train_size(portion)
 
 max_iterations = args.num_iters
-if datatype == "count":
-    max_iterations = 16000
+if datatype == "count" and model != "robust" and args.matrix:
+    max_iterations = 30000
+
+if datatype =="count" and not args.matrix:
+    max_iterations = 10000
 
 factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[50, 100, 200])
 

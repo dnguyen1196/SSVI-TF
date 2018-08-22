@@ -7,7 +7,9 @@ read outdir # output directory
 
 echo "Output directory: $outdir"
 
-script="./venv/bin/python -u test.py --diag --matrix"
+# NOTE!!!!
+# Depending on the type of experiments change this
+script="./venv/bin/python -u test.py "
 
 while IFS=' ' read -r data model noise
 do
