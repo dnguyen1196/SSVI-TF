@@ -362,15 +362,15 @@ class SSVI_TF(object):
         grad_sqr = np.square(mGrad)
         self.ada_acc_grad[dim][:, i] += grad_sqr
 
-        # return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        if self.likelihood_type != "poisson":
-            return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        else:
-            return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        #if self.likelihood_type != "poisson":
+        #    return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
+        #else:
+        #    return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
-        if self.likelihood_type == "poisson":
-            return self.cov_eta/(self.time_step[dim] + 1)
+        #if self.likelihood_type == "poisson":
+        #    return self.cov_eta/(self.time_step[dim] + 1)
 
         return self.cov_eta/(self.time_step[dim] + 1)
 
