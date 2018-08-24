@@ -31,8 +31,8 @@ def get_init_values(datatype, D):
     return {"cov0" : cov0, "mean0" : mean0}
 
 def synthesize_tensor(datatype, using_ratio, noise):
-    #dims = [50, 50, 50] # minitest so a small tensor
-    dims = [50, 50, 50]
+    dims = [5, 5, 5] # minitest so a small tensor
+    #dims = [50, 50, 50]
     #dims = [25, 25, 25]
     real_dim = 100
     means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 10, np.ones((real_dim,)) * 2]
@@ -52,7 +52,8 @@ def synthesize_tensor(datatype, using_ratio, noise):
     return tensor
 
 def synthesize_matrix(datatype, noise_ratio, noise_amount):
-    dims = [20, 20]
+    #dims = [20, 20]
+    dims = [5,5]
     real_dim = 100
     means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 2]
     covariances = [np.eye(real_dim) * 2, np.eye(real_dim) * 3]
@@ -84,9 +85,9 @@ parser.add_argument("-it", "--num_iters", type=int, help="Max number of iteratio
 parser.add_argument("-re", "--report", type=int, help="Report interval", default=500)
 parser.add_argument("--quadrature", action="store_true", help="using quadrature")
 parser.add_argument("--matrix", action="store_true", help="Doing matrix factorization instead of tensor factorization")
-parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta")
+parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta", default=1.0)
 parser.add_argument("--rand", action="store_true", help="Using random start")
-
+parser.add_argument("-meta", "--mean_eta", type=float, help="mean eta", default=1.0)
 
 args = parser.parse_args()
 
@@ -125,9 +126,8 @@ init_vals        = get_init_values(datatype, D)
 
 params           = {**default_params, **factorizer_param, **init_vals, "tensor" : synthetic_tensor }
 
-if args.cov_eta is not None:
-    params["cov_eta"] = args.cov_eta
-
+params["cov_eta"] = args.cov_eta
+params["eta"] = args.mean_eta
 params["randstart"] = randstart
 
 if fixed_covariance: # Special option to test, keep a fixed covariance
@@ -159,8 +159,8 @@ if datatype =="count" and not args.matrix:
 factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 10, 20,  50, 100, 200])
 
 v1, _ = factorizer.posterior.get_vector_distribution(0, 1)
-v2, _ = factorizer.posterior.get_vector_distribution(1, 10)
-v3, _ = factorizer.posterior.get_vector_distribution(2, 30)
+v2, _ = factorizer.posterior.get_vector_distribution(1, 4)
+v3, _ = factorizer.posterior.get_vector_distribution(2, 3)
 print(v1)
 print(v2)
 print(v3)

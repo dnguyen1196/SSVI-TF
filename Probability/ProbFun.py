@@ -9,7 +9,7 @@ np.seterr(all="ignore")
 Probability functions, used for random sampling
 as well as taking derivative of the various distributions
 """
-epsilon = 1e-8
+epsilon = 1e-16
 
 # def sigmoid(x):
 #     try:
@@ -19,10 +19,13 @@ epsilon = 1e-8
 #         print("Overflow")
 #         return np.minimum(np.maximum(x, epsilon), 1 - epsilon)
 
-def sigmoid(x):
+def sigmoid(x, epsilon=0):
     res = 1./(1 + np.exp(-x))
+    #return res
     res = np.nan_to_num(res)
-    return np.minimum(np.maximum(res, epsilon), 1 - epsilon)
+    #return np.minimum(np.maximum(res, epsilon), 1 - epsilon)i
+    res = np.maximum(res, epsilon)
+    return res
 
 def sigmoid_scalar(x):
     try:
@@ -44,9 +47,11 @@ def sigmoid_scalar(x):
 #         print("warning")
 #         return f
 
-def poisson_link(f):
+def poisson_link(f, epsilon=1e-16):
     res = np.log(1 + np.exp(f))
+    res = np.nan_to_num(res)
     return np.maximum(res, epsilon)
+    #return res
 
 def poisson_link_scalar(f):
     try:

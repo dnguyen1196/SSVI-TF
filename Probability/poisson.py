@@ -3,7 +3,6 @@ from Probability.ProbFun import poisson_link, sigmoid
 from scipy.stats import poisson
 from scipy.special import factorial
 
-
 class PoissonDistribution(object):
     def __init__(self):
         self.epsilon = 1e-8
@@ -17,10 +16,9 @@ class PoissonDistribution(object):
     def pdf(self, y, m, S=None):
         A = poisson_link(m)
         # res = np.divide(np.multiply(np.power(A, y), np.exp(-A)), factorial(y))
-        res = poisson.pmf(y, poisson_link(m))
+        res = poisson.pmf(y, A)
 
-        res = np.maximum(res, self.epsilon)
-
+        #res = np.maximum(res, self.epsilon)
         # print("res: ", res)
         return res
 
@@ -35,13 +33,13 @@ class PoissonDistribution(object):
 
         temp = np.subtract(np.divide(y, A), 1)
         res  = np.multiply(pdf, np.multiply(sigm, temp))
-
         return res
 
     def snd_derivative_pdf(self, y, m, s=None):
         pdf = self.pdf(y, poisson_link(m))
         sigm   = sigmoid(m)
         A   = poisson_link(m)
+
         pmf_prime = self.fst_derivative_pdf(y, m)
 
         assert(sigm.shape == m.shape)

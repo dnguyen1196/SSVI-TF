@@ -7,7 +7,7 @@ class SSVI_TF_robust(SSVI_TF):
     def __init__(self, tensor, rank, mean_update="S", cov_update="N", noise_update="N", \
                  diag=False, mean0=None, cov0=None, sigma0=1, \
                  unstable_cov=False, k1=64, k2=64, batch_size=128, \
-                 eta=1, cov_eta=1, sigma_eta=1, quadrature=True, randstart=True):
+                 eta=1, cov_eta=1, sigma_eta=1, quadrature=False, randstart=True):
 
         super(SSVI_TF_robust, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
                  mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta, randstart)
@@ -16,6 +16,9 @@ class SSVI_TF_robust(SSVI_TF):
         self.w_sigma = 1.
         self.w_ada_grad = 0.
         self.noise_added = True
+
+        self.numerical_epsilon = 1e-16
+
         self.quadrature = quadrature
         if quadrature:
             self.gauss_degree = 30
@@ -206,3 +209,32 @@ class SSVI_TF_robust(SSVI_TF):
             return self.w_sigma
 
         return next_sigma
+
+    def estimate_expectation_term_vlb(self, entry, val):
+        k = 20
+        sampled_vectors_prod = np.ones((k, self.D))
+
+        for dim, col in enumerate(entry):
+            m, S = self.posterior.get_vector_distribution(dim, col)
+            samples = np.random.multivariate_normal(m, S, size=k)
+            sampled_vectors_prod *= samples
+
+        ms = np.sum(sampled_vectors_prod, axis=1) # (k,)
+
+        ws = np.random.rayleigh(np.square(self.w_sigma), (k,))
+        fs = np.random.normal(ms, ws, size=(k,k))
+        s = self.likelihood_param
+
+        # pdf.shape = (k,k)
+        pdf = self.likelihood.pdf(val, self.link_fun(fs), s)
+
+        expected_pdf = np.mean(pdf, axis=1) # shape = (k,)
+        log_expected_pdf = np.log(expected_pdf)
+        e_term = np.mean(log_expected_pdf)
+        return e_term
+
+
+
+
+
+

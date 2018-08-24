@@ -5,7 +5,7 @@ from scipy.stats import bernoulli
 
 class BernoulliDistribution(object):
     def __init__(self):
-        self.epsilon = 1e-8
+        self.epsilon = 1e-16
 
     def __str__(self):
         return "BernoulliDistribution"
@@ -14,19 +14,21 @@ class BernoulliDistribution(object):
         return np.random.binomial(1, sigmoid(m), size=k)
 
     def pdf(self, y, m, s=None):
-        res = sigmoid(np.multiply(y, m))
+        res = sigmoid(np.multiply(y, m), self.epsilon)
         # print(res)
         # print(np.any(np.iszero(res)))
         # print(not np.any(res))
         return res
 
     def fst_derivative_pdf(self, y, m, s=None):
-        temp = np.multiply(y, sigmoid(np.multiply(y, m)))
-        res  = np.multiply(temp, np.subtract(1, sigmoid(np.multiply(y, m))))
+        sigm = sigmoid(np.multiply(y,m), self.epsilon)
+        temp = np.multiply(y, sigm)
+
+        res  = np.multiply(temp, np.subtract(1, sigm))
         return res
 
     def snd_derivative_pdf(self, y, m, s=None):
-        s = sigmoid(y * m)
+        s = sigmoid(y * m, self.epsilon)
         # return y * np.square(1 - s) * s - y * np.square(s) * (1 - s)
         res = s * (1-s) * (1 - 2*s)
         # print(np.any(np.isnan(res)))

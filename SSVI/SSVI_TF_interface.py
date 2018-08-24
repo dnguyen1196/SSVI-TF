@@ -42,6 +42,7 @@ class SSVI_TF(object):
         self.w_sigma0 = sigma0
         self.unstable_cov = unstable_cov
         self.cov_epsilon  = 1e-7
+        self.min_eigenval = 0.0001
 
         self.k1     = k1
         self.k2     = k2
@@ -304,6 +305,11 @@ class SSVI_TF(object):
 
         else:
             raise Exception("Unidentified update formula for covariance param")
+
+        #S_next = S_next + np.eye(self.D) * self.cov_eta
+        w,v = np.linalg.eig(S_next)
+        w   = np.maximum(w, self.min_eigenval)
+        S_next = np.dot(v, np.dot(np.diag(w),v.transpose()))
         return S_next
 
     def update_mean_param_diag(self, dim, i, m, S, di_acc, Di_acc):
@@ -323,6 +329,7 @@ class SSVI_TF(object):
             m_next   = np.multiply(S, C_next) # S S^(-1) m
         else:
             raise Exception("Unidentified update formula for covariance param")
+
         return m_next
 
     def update_cov_param_diag(self, dim, i, m, S, di_acc,  Di_acc):
@@ -440,7 +447,7 @@ class SSVI_TF(object):
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
             print("iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  |", end=" ")
-            print("test_nll | train_nll ", end=" ")
+            print("test_nll | train_nll |    VLB   |  E-term  |    KL    ", end=" ")
 
             if self.noise_added:
                 print("|   dw   |")
@@ -451,6 +458,7 @@ class SSVI_TF(object):
         dec = 4
         rsme_train, error_train = self.evaluate_train_error()
         rsme_test, error_test   = self.evaluate_test_error()
+        E_term, KL = self.estimate_vlb(self.tensor.train_entries, self.tensor.train_vals)
 
         print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
               .format(iteration, np.around(current - start,2),\
@@ -461,15 +469,15 @@ class SSVI_TF(object):
               np.around(mean_change, dec),\
               np.around(cov_change, dec)), end=" ")
 
-        # test_nll = self.evaluate_nll(self.tensor.test_entries, self.tensor.test_vals)
-        # train_nll = self.evaluate_nll(self.tensor.train_entries, self.tensor.train_vals)
-
         test_nll = self.estimate_negative_log_likelihood(self.tensor.test_entries, self.tensor.test_vals)
         train_nll = self.estimate_negative_log_likelihood(self.tensor.train_entries, self.tensor.train_vals)
 
-        print('{:^10} {:^10}'\
+        print('{:^10} {:^10} {:^10} {:^10} {:^10}'\
               .format(np.around(test_nll, 2), \
-                      np.around(train_nll, 2)), end=" ")
+                      np.around(train_nll, 2),\
+                      np.around(E_term - KL),\
+                      np.around(E_term, 3),\
+                      np.around(KL, 3)), end=" ")
 
         if self.noise_added:
             print('{:^10}'.format(np.around(self.w_changes, dec)))
@@ -499,25 +507,60 @@ class SSVI_TF(object):
             #print("{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current - start,2), rsme_test, rsme_train, np.around(mean_change, dec), np.around(cov_change, dec)))
             print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), rsme_test, np.around(mean_change, dec), np.around(cov_change, dec)))
 
-
     def estimate_vlb(self, entries, values):
-        raise NotImplementedError
+        """
+        """
+        vlb = 0.
+        KL  = self.estimate_KL_divergence()
+        for i, entry in enumerate(entries):
+            vlb += self.estimate_expectation_term_vlb(entry, values[i])
+        return vlb, KL
 
-    def estimate_expected_log_likelihood(self, m, S):
-        raise NotImplementedError
+    def estimate_expectation_term_vlb(self, entry, val):
+        """
+        Estimate the expectation term in the VLB
+        by samplings
+        """
+        k = 20
+        sampled_vectors_prod = np.ones((k, self.D))
 
-    def compute_KL_divergence(self, m, S):
-        raise NotImplementedError
+        for dim, col in enumerate(entry):
+            m, S = self.posterior.get_vector_distribution(dim, col)
+            samples = np.random.multivariate_normal(m, S, size=k)
+            sampled_vectors_prod *= samples
 
-    def evaluate_nll(self, entries, values):
-        nll = 0.
-        for i in range(len(values)):
-            entry = entries[i]
-            k     = values[i]
-            m, S  = self.compute_posterior_param(entry)
-            likelihood = self.compute_gauss_hermite(k, m, S)
-            nll       -= np.log(likelihood)
-        return nll
+        ms = np.sum(sampled_vectors_prod, axis=1) # shape = (k,)
+        if self.noise_added:
+            ws = np.random.rayleigh(np.square(self.w_sigma), (k,))
+            fs = np.random.normal(ms, ws, size=(k, k))
+        else:
+            fs = ms
+        s = self.likelihood_param
+        expected_ll = np.mean(self.likelihood.log_pdf(val, self.link_fun(fs), s))
+        return expected_ll
+
+    def estimate_KL_divergence(self):
+        """
+        Estimate the KL divergence components of the VLB
+        """
+        KL = 0.
+        for dim, ncol in enumerate(self.dims):
+            for col in range(ncol):
+                m, S = self.posterior.get_vector_distribution(dim, col)
+                sigma = self.pSigma[dim]
+                S1    = np.diag(np.full((self.D,),sigma))
+                m1    = self.pmu
+                if self.diag:
+                    KL = self.KL_distance_multivariate_normal(m, np.diag(S), m1, S1)
+                else:
+                    KL = self.KL_distance_multivariate_normal(m, S, m1, S1)
+        return KL
+
+    def KL_distance_multivariate_normal(self, m0, S0, m1, S1):
+        KL = 0.5 * (np.trace(np.dot(inv(S1),S0)) \
+                        + np.dot(np.transpose(m1 - m0), np.dot(inv(S1), m1 - m0))\
+                        - self.D + np.log(np.linalg.det(S1)/ np.linalg.det(S0)))
+        return KL
 
     def estimate_negative_log_likelihood(self, entries, vals):
         nll = 0.
