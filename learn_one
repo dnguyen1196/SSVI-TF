@@ -1,4 +1,10 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_23/tensor/count/
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_24/tensor_fixed/
+real deterministic 0
+real simple 0
+real robust 0
+binary deterministic 0
+binary simple 0
+binary robust 0
 count deterministic 0
 count simple 0
 count robust 0

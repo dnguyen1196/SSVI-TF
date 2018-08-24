@@ -156,7 +156,7 @@ if datatype == "count" and model != "robust" and args.matrix:
 if datatype =="count" and not args.matrix:
     max_iterations = 10000
 
-factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 10, 20,  50, 100, 200])
+factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 5, 10, 20,  50, 100, 200])
 
 v1, _ = factorizer.posterior.get_vector_distribution(0, 1)
 v2, _ = factorizer.posterior.get_vector_distribution(1, 4)
