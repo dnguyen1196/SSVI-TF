@@ -57,6 +57,10 @@ class SSVI_TF_robust(SSVI_TF):
 
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(ys, mean_batch, vjs_batch, ws_batch)
 
+        #assert(not np.any(np.iscomplex(di)))
+        #assert(not np.any(np.iscomplex(Di)))
+        #assert(not np.any(np.iscomplex(si)))
+
         return di, Di, si
 
     def approximate_di_Di_si_with_second_layer_samplings(self, ys, mean_batch, vjs_batch, ws_batch):
@@ -76,6 +80,16 @@ class SSVI_TF_robust(SSVI_TF):
         else:
             phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
 
+        #assert(not np.any(np.iscomplex(phi)))
+        #assert(not np.any(np.iscomplex(phi_fst)))
+        #assert(not np.any(np.iscomplex(phi_snd)))
+        assert(not np.any(np.isnan(phi)))
+        assert(not np.any(np.isnan(phi_snd)))
+        assert(not np.any(np.isnan(phi_fst)))
+        assert(not np.any(np.isinf(phi)))
+        assert(not np.any(np.isinf(phi_fst)))
+        assert(not np.any(np.isinf(phi_snd)))
+
         di = np.zeros((num_samples, self.D))
         if self.diag:
             Di = np.zeros((num_samples, self.D))
@@ -88,7 +102,7 @@ class SSVI_TF_robust(SSVI_TF):
             p = phi[num, :]
             p1 = phi_fst[num, :]
             p2 = phi_snd[num, :]
-
+            assert(not np.any(p == 0))
             v  = vjs_batch[num, :, :] # v.shape = (k1, D)
             w  = ws_batch[num, :]     # w.shape = (k1,)
 
@@ -120,6 +134,12 @@ class SSVI_TF_robust(SSVI_TF):
         di = np.sum(di, axis=0)
         Di = np.sum(Di, axis=0)
         si = np.sum(si)
+
+        #assert(not np.any(np.iscomplex(di)))
+        #assert(not np.any(np.iscomplex(Di)))
+        #assert(not np.any(np.iscomplex(si)))
+        assert(not np.any(np.isnan(Di)))
+        assert(not np.any(np.isinf(Di)))
 
         return di, Di, si
 
@@ -216,7 +236,10 @@ class SSVI_TF_robust(SSVI_TF):
 
         for dim, col in enumerate(entry):
             m, S = self.posterior.get_vector_distribution(dim, col)
-            samples = np.random.multivariate_normal(m, S, size=k)
+            if self.diag:
+                samples = np.random.multivariate_normal(m, np.diag(S), size=k)
+            else:
+                samples = np.random.multivariate_normal(m, S, size=k)
             sampled_vectors_prod *= samples
 
         ms = np.sum(sampled_vectors_prod, axis=1) # (k,)

@@ -51,7 +51,7 @@ class Posterior_Full_Covariance(Posterior):
                 matrices[i, 0, :]   = np.copy(mean)
                 matrices[i, 1 :, :] = np.copy(cov)
             else:
-                matrices[i, 0, :]   = np.random.multivariate_normal(mean, np.eye(self.D))
+                matrices[i, 0, :]   = np.random.multivariate_normal(mean, cov)
                 matrices[i, 1 :, :]   = np.copy(cov)
         return matrices
 
@@ -75,7 +75,7 @@ class Posterior_Diag_Covariance(Posterior):
                 matrices[i, 0, :]  = np.copy(mean)
                 matrices[i, 1, :]  = np.copy(np.diag(cov))
             else:
-                matrices[i, 0, :] = np.random.multivariate_normal(mean, np.eye(self.D))
+                matrices[i, 0, :] = np.random.multivariate_normal(mean, cov)
                 matrices[i, 1, :] = np.copy(np.diag(cov))
         return matrices
 

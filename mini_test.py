@@ -130,9 +130,7 @@ params["cov_eta"] = args.cov_eta
 params["eta"] = args.mean_eta
 params["randstart"] = randstart
 
-if fixed_covariance: # Special option to test, keep a fixed covariance
-    if datatype == "binary" or datatype == "count":
-        params["cov0"] = np.eye(D) * 0.1
+params["cov0"] = np.eye(D)
 
 
 
@@ -153,8 +151,6 @@ max_iterations = args.num_iters
 if datatype == "count" and model != "robust" and args.matrix:
     max_iterations = 30000
 
-if datatype =="count" and not args.matrix:
-    max_iterations = 10000
 
 factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 10, 20,  50, 100, 200])
 

@@ -23,7 +23,7 @@ def sigmoid(x, epsilon=0):
     res = 1./(1 + np.exp(-x))
     #return res
     res = np.nan_to_num(res)
-    #return np.minimum(np.maximum(res, epsilon), 1 - epsilon)i
+    #res = np.minimum(np.maximum(res, epsilon), 1 - epsilon)
     res = np.maximum(res, epsilon)
     return res
 
@@ -47,7 +47,7 @@ def sigmoid_scalar(x):
 #         print("warning")
 #         return f
 
-def poisson_link(f, epsilon=1e-16):
+def poisson_link(f, epsilon=1e-8):
     res = np.log(1 + np.exp(f))
     res = np.nan_to_num(res)
     return np.maximum(res, epsilon)

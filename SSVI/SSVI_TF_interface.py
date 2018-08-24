@@ -42,7 +42,7 @@ class SSVI_TF(object):
         self.w_sigma0 = sigma0
         self.unstable_cov = unstable_cov
         self.cov_epsilon  = 1e-7
-        self.min_eigenval = 0.0001
+        self.min_eigenval = 0.01
 
         self.k1     = k1
         self.k2     = k2
@@ -181,6 +181,11 @@ class SSVI_TF(object):
         Di *= scale
         di *= scale
 
+        assert(not np.any(np.iscomplex(di)))
+        assert(not np.any(np.iscomplex(Di)))
+        assert(not np.any(np.isnan(Di)))
+        assert(not np.any(np.isinf(Di)))
+
         # Compute next covariance and mean
         if self.diag:
             S_next   = self.update_cov_param_diag(dim, i, m, S, di, Di)
@@ -189,7 +194,12 @@ class SSVI_TF(object):
             S_next   = self.update_cov_param(dim, i, m, S, di, Di)
             m_next   = self.update_mean_param(dim, i, m, S, di, Di)
 
-        # If covariance is unstable add a small perturbation to S
+        # Sanity check
+        assert(not np.any(np.iscomplex(S_next)))
+        assert(not np.any(np.isnan(S_next)))
+        assert(not np.any(np.isinf(S_next)))
+        #assert(not np.any(np.iscomplex(m_next)))
+
         # if self.unstable_cov:
         #     add    = np.full((self.D,), self.cov_epsilon)
         #     S_next = S_next + np.diag(add) if not self.diag else S_next + add
@@ -307,8 +317,8 @@ class SSVI_TF(object):
             raise Exception("Unidentified update formula for covariance param")
 
         #S_next = S_next + np.eye(self.D) * self.cov_eta
-        w,v = np.linalg.eig(S_next)
-        w   = np.maximum(w, self.min_eigenval)
+        w,v = np.linalg.eigh(S_next)
+        w   = np.maximum(np.real(w), self.min_eigenval)
         S_next = np.dot(v, np.dot(np.diag(w),v.transpose()))
         return S_next
 
@@ -526,7 +536,10 @@ class SSVI_TF(object):
 
         for dim, col in enumerate(entry):
             m, S = self.posterior.get_vector_distribution(dim, col)
-            samples = np.random.multivariate_normal(m, S, size=k)
+            if self.diag:
+                samples = np.random.multivariate_normal(m, np.diag(S), size=k)
+            else:
+                samples = np.random.multivariate_normal(m, S, size=k)
             sampled_vectors_prod *= samples
 
         ms = np.sum(sampled_vectors_prod, axis=1) # shape = (k,)
