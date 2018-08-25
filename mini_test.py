@@ -148,8 +148,8 @@ if portion is not None:
     synthetic_tensor.reduce_train_size(portion)
 
 max_iterations = args.num_iters
-if datatype == "count" and model != "robust" and args.matrix:
-    max_iterations = 30000
+#if datatype == "count" and model != "robust" and args.matrix:
+#    max_iterations = 30000
 
 
 factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 5, 10, 20,  50, 100, 200])
