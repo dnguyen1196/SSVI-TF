@@ -13,18 +13,21 @@ parser.add_argument("-d", "--datatype", type=str, help="tensor data type")
 parser.add_argument("--diag", action="store_true", help="using diagonal covariance")
 parser.add_argument("-re", "--report", type=int, help="report interval", default=10)
 parser.add_argument("-iter","--iteration", type=int, help="number of iterations", default=500)
+parser.add_argument("-m", "--model", type=str, help="model being used", choices=["deterministic", "simple", "robust"])
 
 args = parser.parse_args()
 
 
 filename = args.filename
 datatype    = args.datatype
+model    = args.model
 
-tensor = count_tensor()
-
-tensor.read_from_file(filename, 0.7, 0.1, 0.2)
-print("min_count:", tensor.min_count)
-print("max_count:", tensor.max_count)
+tensor = None
+if datatype == "count":
+    tensor = count_tensor()
+    tensor.read_from_file(filename, 0.7, 0.1, 0.2)
+    print("min_count:", tensor.min_count)
+    print("max_count:", tensor.max_count)
 
 D = 50
 
@@ -51,11 +54,8 @@ def get_init_values(datatype, D):
 
 
 # TODO: to replace by command line option
-model = "deterministic"
-datatype = "count"
 diag = args.diag
 using_quadrature = False
-
 
 factorizer_param = get_factorizer_param(model, datatype, diag, using_quadrature)
 init_vals        = get_init_values(datatype, D)
@@ -63,7 +63,8 @@ params           = {**default_params, **factorizer_param, **init_vals, "tensor" 
 
 params["diag"] = diag
 params["batch_size"] = 512
-params["cov_eta"] = 0.001
+params["cov_eta"] = 1
+params["eta"] = 1
 
 if model == "deterministic":
     factorizer = SSVI_TF_d(**params)
