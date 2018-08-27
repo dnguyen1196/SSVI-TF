@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pds
+import math
 from Probability.ProbFun import poisson_link, sigmoid
 from scipy.stats import poisson
 from scipy.special import factorial
@@ -20,7 +22,7 @@ class PoissonDistribution(object):
         res = np.power(A, y) / (1 + np.exp(m)) / np.math.factorial(y)
         res = np.maximum(res, self.epsilon)
         # print("res: ", res)
-        assert(not np.any(np.isnan(res)))
+        assert(not np.any(pds.isnull(res)))
         return res
 
     def fst_derivative_pdf(self, y, m, S=None):
@@ -34,6 +36,7 @@ class PoissonDistribution(object):
 
         temp = np.subtract(np.divide(y, A), 1)
         res  = np.multiply(pdf, np.multiply(sigm, temp))
+        assert(not np.any(pds.isnull(res)))
         return res
 
     def snd_derivative_pdf(self, y, m, s=None):
@@ -56,14 +59,15 @@ class PoissonDistribution(object):
                 + np.multiply(y / A - 1, np.multiply(sigm, 1 - sigm))
 
         temp2 = np.multiply(pdf, temp)
-
-        return temp1 + temp2
+        res = temp1 + temp2
+        assert(not np.any(pds.isnull(res)))
+        return res
 
     def log_pdf(self, y, m, s=None):
         f  = poisson_link(m)
         t1 = y * np.log(f)
         t2 = -f
-        t3 = -np.log(np.math.factorial(y))
+        t3 = -math.log(np.math.factorial(y))
         #return poisson.logpmf(y, poisson_link(m))
         return t1 + t2 + t3
 

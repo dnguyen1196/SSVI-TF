@@ -1,3 +1,4 @@
+import math
 from SSVI.SSVI_TF_interface import SSVI_TF
 from Model.TF_Models import Posterior_Full_Covariance
 import numpy as np
@@ -252,7 +253,9 @@ class SSVI_TF_robust(SSVI_TF):
         pdf = self.likelihood.pdf(val, self.link_fun(fs), s)
 
         expected_pdf = np.mean(pdf, axis=1) # shape = (k,)
-        log_expected_pdf = np.log(expected_pdf)
+
+        #log_expected_pdf = math.log(expected_pdf)
+        log_expected_pdf = np.log(expected_pdf.astype(float))
         e_term = np.mean(log_expected_pdf)
         return e_term
 
