@@ -7,7 +7,7 @@ opts="-p batch -c 2 --mem=16000 --time=4-00:00:00 --mail-type=ALL --mail-user=$U
 read outdir # output directory
 echo "Output directory: $outdir"
 
-script="./venv/bin/python -u factorize.py --diag -f ../tensor-data/GDELT2011/GDELT.2011.REDUCED.cleaned.txt -d count"
+script="./venv/bin/python -u factorize.py --diag -f ../tensor-data/GDELT2011/GDELT.2011.REDUCED.cleaned.txt -d count -re 2"
 
 while IFS=' ' read -r model
 do

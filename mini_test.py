@@ -30,8 +30,7 @@ def get_init_values(datatype, D):
         mean0 = np.ones((D,)) * 0.1
     return {"cov0" : cov0, "mean0" : mean0}
 
-def synthesize_tensor(datatype, using_ratio, noise):
-    dims = [5, 5, 5] # minitest so a small tensor
+def synthesize_tensor(dims, datatype, using_ratio, noise):
     #dims = [50, 50, 50]
     #dims = [25, 25, 25]
     real_dim = 100
@@ -51,9 +50,7 @@ def synthesize_tensor(datatype, using_ratio, noise):
                            train=0.8, sparsity=1, noise=noise, noise_ratio=using_ratio)
     return tensor
 
-def synthesize_matrix(datatype, noise_ratio, noise_amount):
-    #dims = [20, 20]
-    dims = [5,5]
+def synthesize_matrix(dims, datatype, noise_ratio, noise_amount):
     real_dim = 100
     means = [np.ones((real_dim,)) * 5, np.ones((real_dim,)) * 2]
     covariances = [np.eye(real_dim) * 2, np.eye(real_dim) * 3]
@@ -88,6 +85,7 @@ parser.add_argument("--matrix", action="store_true", help="Doing matrix factoriz
 parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta", default=1.0)
 parser.add_argument("--rand", action="store_true", help="Using random start")
 parser.add_argument("-meta", "--mean_eta", type=float, help="mean eta", default=1.0)
+parser.add_argument("-dim", "--dimension", nargs='+', required=True)
 
 args = parser.parse_args()
 
@@ -104,7 +102,7 @@ default_params["diag"] = diag
 fixed_covariance = args.fixed_cov
 using_quadrature = args.quadrature
 randstart = args.rand
-
+dims      = [int(x) for x in args.dimension]
 
 if NOISE_RATIO is not None:
     using_ratio = True
@@ -116,10 +114,12 @@ else:
     using_ratio = True
     noise = 0
 
-if not args.matrix: # If not using matrix
-    synthetic_tensor = synthesize_tensor(datatype, using_ratio, noise)
+if len(dims) == 3:
+    synthetic_tensor = synthesize_tensor(dims, datatype, using_ratio, noise)
+elif len(dims) == 2:
+    synthetic_tensor = synthesize_matrix(dims, datatype, using_ratio, noise)
 else:
-    synthetic_tensor = synthesize_matrix(datatype, using_ratio, noise)
+    raise Exception("Have not implemented the necessary dimensions")
 
 factorizer_param = get_factorizer_param(model, datatype, diag, using_quadrature)
 init_vals        = get_init_values(datatype, D)
