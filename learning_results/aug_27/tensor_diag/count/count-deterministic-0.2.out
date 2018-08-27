@@ -1,0 +1,17 @@
+Generating synthetic count valued data ... 
+Generating synthetic  count valued data took:  16.459406852722168
+max_count =  39.0  min count =  0.0
+Evaluation for true params: 
+ test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
+0.3122819239 0.3088850919   0.09752      0.09541      164588.7    656124.92  
+Factorizing with max_iteration = 8000  fixing covariance?:  False
+Tensor dimensions:  [50, 50, 50]
+Optimization metrics: 
+Using Ada Grad
+Mean update scheme:  S
+Covariance update :  N
+Using diagonal covariance?:  True
+Random start? True
+k1 samples =  64  k2 samples =  64
+eta =  1.0  cov eta =  1.0  sigma eta =  1
+iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  | test_nll | train_nll |    VLB   |  E-term  |    KL     

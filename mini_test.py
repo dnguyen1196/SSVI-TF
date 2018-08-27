@@ -85,7 +85,7 @@ parser.add_argument("--matrix", action="store_true", help="Doing matrix factoriz
 parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta", default=1.0)
 parser.add_argument("--rand", action="store_true", help="Using random start")
 parser.add_argument("-meta", "--mean_eta", type=float, help="mean eta", default=1.0)
-parser.add_argument("-dim", "--dimension", nargs='+', required=True)
+parser.add_argument("-dim", "--dimension", nargs='+', required=True, default=[50, 50, 50])
 
 args = parser.parse_args()
 

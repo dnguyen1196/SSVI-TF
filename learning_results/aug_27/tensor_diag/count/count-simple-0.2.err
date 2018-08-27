@@ -1,0 +1,11 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "mini_test.py", line 145, in <module>
+    factorizer.evaluate_true_params()
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 871, in evaluate_true_params
+    self.tensor.matrices)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 962, in evaluate_true_model_nll
+    expected_ll = np.mean(self.likelihood.pdf(vals[i], fs, s))
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Probability/poisson.py", line 23, in pdf
+    assert(not np.any(np.isnan(res)))
+TypeError: ufunc 'isnan' not supported for the input types, and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''

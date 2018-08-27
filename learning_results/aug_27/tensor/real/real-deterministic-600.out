@@ -1,0 +1,18 @@
+Generating synthetic real valued data ... 
+Generating synthetic  real valued data took:  9.504223346710205
+Evaluation for true params: 
+ test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
+602.0920404727 601.2073392596 0.0489757024 0.0488317056  287424.78    1149895.59 
+Factorizing with max_iteration = 8000  fixing covariance?:  False
+Tensor dimensions:  [50, 50, 50]
+Optimization metrics: 
+Using Ada Grad
+Mean update scheme:  S
+Covariance update :  N
+Using diagonal covariance?:  False
+Random start? True
+k1 samples =  64  k2 samples =  64
+eta =  1.0  cov eta =  1.0  sigma eta =  1
+iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  | test_nll | train_nll |    VLB   |  E-term  |    KL     
+    0         1.13    9995.1647    0.998    9999.8722    0.998      3.1623     4.4274   287823.14  1151292.55 -1151301.0 -1151292.546   8.159    
+    5        298.88   9990.6037    0.9976   9995.3134    0.9976     3.1623     4.4274   287823.14  1151292.55 -1151301.0 -1151292.546   8.269    

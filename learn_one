@@ -1,10 +1,10 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_25/tensor_fixed_diag/
-real deterministic 0
-real simple 0
-real robust 0
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_27/tensor_diag/binary/
 binary deterministic 0
 binary simple 0
 binary robust 0
-count deterministic 0
-count simple 0
-count robust 0
+binary deterministic 1
+binary simple 1
+binary robust 1
+binary deterministic 2
+binary simple 2
+binary robust 2
