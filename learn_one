@@ -1,10 +1,10 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_27/tensor_diag/binary/
-binary deterministic 0
-binary simple 0
-binary robust 0
-binary deterministic 1
-binary simple 1
-binary robust 1
-binary deterministic 2
-binary simple 2
-binary robust 2
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/aug_27/tensor/count/
+count deterministic 0
+count simple 0
+count robust 0
+count deterministic 0.2
+count simple 0.2
+count robust 0.2
+count deterministic 0.4
+count simple 0.4
+count robust 0.4

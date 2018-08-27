@@ -1,15 +1,1 @@
 _frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
-Traceback (most recent call last):
-  File "mini_test.py", line 155, in <module>
-    factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 5, 10, 20,  50, 100, 200])
-  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 135, in factorize
-    self.report_metrics(iteration, start, mean_change, cov_change)
-  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 471, in report_metrics
-    E_term, KL = self.estimate_vlb(self.tensor.train_entries, self.tensor.train_vals)
-  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 526, in estimate_vlb
-    vlb += self.estimate_expectation_term_vlb(entry, values[i])
-  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 552, in estimate_expectation_term_vlb
-    expected_ll = np.mean(self.likelihood.log_pdf(val, self.link_fun(fs), s))
-  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Probability/poisson.py", line 66, in log_pdf
-    t3 = -np.log(np.math.factorial(y))
-AttributeError: 'int' object has no attribute 'log'
