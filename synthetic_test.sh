@@ -9,7 +9,7 @@ echo "Output directory: $outdir"
 # NOTE!!!!
 # Depending on the type of experiments change this
 #script="./venv/bin/python -u test.py -tr 0.05"
-script="./venv/bin/python -u mini_test.py --rand -re 100 -meta 1 -ceta 1 -dim 50 50 50 --diag"
+script="./venv/bin/python -u mini_test.py --rand -re 100 -meta 1 -ceta 1 -dim 50 50 50 -it 16000"
 # NOTE: TRAIN SIZE
 # NOTE; --matrix
 # NOTE: --fixed cov
