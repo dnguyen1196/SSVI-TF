@@ -97,6 +97,7 @@ class SSVI_TF(object):
         self.to_report = to_report
         self.max_iteration = max_iteration
         self.fixed_covariance = fixed_covariance
+        self.detailed_report = detailed_report
         self.missing = {}
         self.max_changes = [[0, 0] for _ in self.dims]
 
@@ -120,7 +121,7 @@ class SSVI_TF(object):
             for dim in range(self.order):
                 if (update_column_pointer[dim] + 1 == self.dims[dim]):
                     self.time_step[dim] += 1  # increase time step
-                    self.max_changes[dim] = [0,0] # Reset max_changes
+                    #self.max_changes[dim] = [0,0] # Reset max_changes
 
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.dims[dim]
@@ -130,8 +131,8 @@ class SSVI_TF(object):
             #cov_change  = max(x[1] for x  in self.max_changes)
             #print(mean_change, cov_change)
 
-            if (iteration != 0 and iteration % self.report == 0) or iteration in to_report:
-                if detailed_report:
+            if (iteration != 0 and (iteration % self.report == 0)) or iteration in to_report:
+                if self.detailed_report:
                     self.report_metrics(iteration, start, mean_change, cov_change)
                 else:
                     self.report_metrics_mini(iteration, start, mean_change, cov_change)
@@ -508,14 +509,14 @@ class SSVI_TF(object):
 
             print("iteration |   time   |test_rsme|  d_mean  |   d_cov  |")
 
-            current = time.time()
-            dec = 4
+        current = time.time()
+        dec = 4
 
             #rsme_train, error_train = self.evaluate_train_error()
-            rsme_test, error_test   = self.evaluate_test_error()
+        rsme_test, error_test   = self.evaluate_test_error()
 
             #print("{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current - start,2), rsme_test, rsme_train, np.around(mean_change, dec), np.around(cov_change, dec)))
-            print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), rsme_test, np.around(mean_change, dec), np.around(cov_change, dec)))
+        print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), np.around(rsme_test,dec), np.around(mean_change, dec), np.around(cov_change, dec)))
 
     def estimate_vlb(self, entries, values):
         """
