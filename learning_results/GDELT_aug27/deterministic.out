@@ -10,3 +10,4 @@ eta =  1  cov eta =  1  sigma eta =  1
 iteration |   time   |test_rsme|  d_mean  |   d_cov  |
     50       696.78    11.3237      5.0       0.467   
    100      17359.21   11.3094      5.0       0.467   
+   150      33749.6    10.8647      5.0       0.467   
