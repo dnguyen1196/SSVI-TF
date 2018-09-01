@@ -25,7 +25,8 @@ class count_tensor(Tensor):
 
     def data_link_fun(self, m):
         f = self.link_fun(m)
-        x = np.rint(f)
+        #x = np.rint(f) # NOTE: change data generation
+        x = np.random.poisson(f)
         self.max_count = max(self.max_count, x)
         self.min_count = min(self.min_count, x)
         return x

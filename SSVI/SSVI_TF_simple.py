@@ -20,41 +20,6 @@ class SSVI_TF_simple(SSVI_TF):
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
-    def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
-        """
-        :param vjs_batch:  (num_sample, k1, D)
-        :param ys:         (num_sample,)
-        :param mean_batch: (num_sample, k1)
-        :param cov_batch:  (num_sample, k1)
-        :param ws_batch:   (num_sample, k1)
-        :return:
-        """
-        num_samples = np.size(vjs_batch, axis=0)
-        fst_deriv_batch, snd_deriv_batch, si = \
-            self.estimate_expected_derivative_batch(ys, mean_batch, cov_batch, ws_batch)
-
-        di = np.zeros((self.D,))
-
-        if self.diag:
-            Di = np.zeros((self.D,))
-        else:
-            Di = np.zeros((self.D,self.D))
-
-        for num in range(num_samples):
-            # Compute vj * scale
-            vjs_batch_scaled = np.transpose(np.multiply(np.transpose(vjs_batch[num, :, :]), \
-                                                        fst_deriv_batch[num, :]))
-            di += np.average(vjs_batch_scaled, axis=0)
-
-            for k1 in range(self.k1):
-                vj = vjs_batch[num, k1, :]
-                if self.diag:
-                    Di += 0.5 * np.multiply(vj, vj) * snd_deriv_batch[num, k1] / self.k1
-                else:
-                    Di += 0.5 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
-
-        return di, Di, si
-
     def estimate_expected_derivative_batch(self, ys, mean_batch, cov_batch, ws_batch):
         num_samples     = np.size(mean_batch, axis=0)
 

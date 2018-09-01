@@ -227,9 +227,9 @@ class SSVI_TF_robust(SSVI_TF):
         next_sigma = np.sqrt(-0.5/update)
 
         if np.isnan(next_sigma):
-            return self.w_sigma
+            return self.w_sigma, w_grad
 
-        return next_sigma
+        return next_sigma, w_grad
 
     def estimate_expectation_term_vlb(self, entry, val):
         k = 20

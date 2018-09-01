@@ -88,6 +88,9 @@ class SSVI_TF(object):
         self.norm_changes = [np.zeros((s, 2)) for s in self.dims]
         self.noise_added  = False
 
+        # Keep track of the mean gradients
+        self.grad_norms   = [np.zeros((s,2)) for s in self.dims]
+
         self.d_mean = 1.
         self.d_cov  = 1.
 
@@ -188,12 +191,17 @@ class SSVI_TF(object):
         assert(not np.any(np.isinf(Di)))
 
         # Compute next covariance and mean
+        # TODO: keep track of the gradient here as well, make the functions return
+        # both the next iterate and the gradient
         if self.diag:
-            S_next   = self.update_cov_param_diag(dim, i, m, S, di, Di)
-            m_next   = self.update_mean_param_diag(dim, i, m, S, di, Di)
+            S_next, S_grad   = self.update_cov_param_diag(dim, i, m, S, di, Di)
+            m_next, m_grad   = self.update_mean_param_diag(dim, i, m, S, di, Di)
         else:
-            S_next   = self.update_cov_param(dim, i, m, S, di, Di)
-            m_next   = self.update_mean_param(dim, i, m, S, di, Di)
+            S_next, S_grad   = self.update_cov_param(dim, i, m, S, di, Di)
+            m_next, m_grad   = self.update_mean_param(dim, i, m, S, di, Di)
+
+        # Keep track of S_grad, m_grad
+        self.grad_norms[dim][i] = [np.linalg.norm(m_grad), np.linalg.norm(S_grad)]
 
         # Sanity check
         assert(not np.any(np.iscomplex(S_next)))
@@ -201,12 +209,9 @@ class SSVI_TF(object):
         assert(not np.any(np.isinf(S_next)))
         #assert(not np.any(np.iscomplex(m_next)))
 
-        # if self.unstable_cov:
-        #     add    = np.full((self.D,), self.cov_epsilon)
-        #     S_next = S_next + np.diag(add) if not self.diag else S_next + add
-
         if self.noise_added:
-            w_sigma        = self.update_sigma_param(si, scale)
+            # TODO: what to do with the grad here
+            w_sigma, _     = self.update_sigma_param(si, scale)
             self.w_changes = np.abs(w_sigma - self.w_sigma)
             self.w_sigma   = w_sigma
 
@@ -252,29 +257,73 @@ class SSVI_TF(object):
         if self.noise_added:
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
         else:
-            ws_batch   = None
+            ws_batch   = np.zeros((num_subsamples, self.k1))
 
         mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
         var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
 
+        #for num in range(num_subsamples):
+        #    vs = vjs_batch[num, :, :] # shape (k1, D)
+        #    if self.diag:
+        #        var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(np.diag(S), vs)), axis=0)
+        #    else:
+        #        var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
+
+        #di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
+
         for num in range(num_subsamples):
-            vs = vjs_batch[num, :, :] # shape (k1, D)
-            if self.diag:
-                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(np.diag(S), vs)), axis=0)
-            else:
-                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
+            vs = vjs_batch[num, :, :] # shape(k1, D)
+
+            for k in range(self.k1):
+                v = vs[k, :]
+                if self.diag:
+                    s = np.sum(np.multiply(S, np.square(v)))
+                else:
+                    s = np.dot(np.transpose(v), np.dot(S, v))
+                var_batch[num, k] = s
+                #var_batch[num, k] = 0
 
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
-
         return di, Di, si
 
     @abstractmethod
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         raise NotImplementedError
 
-    @abstractmethod
     def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
-        raise NotImplementedError
+        """
+        :param vjs_batch:  (num_sample, k1, D)
+        :param ys:         (num_sample,)
+        :param mean_batch: (num_sample, k1)
+        :param cov_batch:  (num_sample, k1)
+        :param ws_batch:   (num_sample, k1)
+        :return:
+        """
+        num_samples = np.size(vjs_batch, axis=0)
+        fst_deriv_batch, snd_deriv_batch, si = \
+            self.estimate_expected_derivative_batch(ys, mean_batch, cov_batch, ws_batch)
+
+        di = np.zeros((self.D,))
+
+        if self.diag:
+            Di = np.zeros((self.D,))
+        else:
+            Di = np.zeros((self.D,self.D))
+
+        for num in range(num_samples):
+            # Compute vj * scale
+            vjs_batch_scaled = np.transpose(np.multiply(np.transpose(vjs_batch[num, :, :]), \
+                                                        fst_deriv_batch[num, :]))
+            di += np.average(vjs_batch_scaled, axis=0)
+
+            for k1 in range(self.k1):
+                vj = vjs_batch[num, k1, :]
+                if self.diag:
+                    Di += 0.5 * np.multiply(vj, vj) * snd_deriv_batch[num, k1] / self.k1
+                else:
+                    Di += 0.5 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
+
+        return di, Di, si
 
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
         sigma = self.pSigma[dim]
@@ -294,7 +343,7 @@ class SSVI_TF(object):
 
         else:
             raise Exception("Unidentified update formula for covariance param")
-        return m_next
+        return m_next, meanGrad
 
     def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
         sigma = self.pSigma[dim]
@@ -321,7 +370,7 @@ class SSVI_TF(object):
         w,v = np.linalg.eigh(S_next)
         w   = np.maximum(np.real(w), self.min_eigenval)
         S_next = np.dot(v, np.dot(np.diag(w),v.transpose()))
-        return S_next
+        return S_next, covGrad
 
     def update_mean_param_diag(self, dim, i, m, S, di_acc, Di_acc):
         sigma = self.pSigma[dim]
@@ -341,7 +390,7 @@ class SSVI_TF(object):
         else:
             raise Exception("Unidentified update formula for covariance param")
 
-        return m_next
+        return m_next, meanGrad
 
     def update_cov_param_diag(self, dim, i, m, S, di_acc,  Di_acc):
         sigma = self.pSigma[dim]
@@ -364,7 +413,7 @@ class SSVI_TF(object):
         else:
             raise Exception("Unidentified update formula for covariance param")
         S_next = np.maximum(S_next, self.epsilon)
-        return S_next
+        return S_next, covGrad
 
     def update_sigma_param(self, si_acc, scale):
         si_acc *= scale
@@ -373,7 +422,7 @@ class SSVI_TF(object):
 
         update = (1-w_step) * (-0.5/np.square(self.w_sigma)) + w_step * w_grad
         next_sigma = np.sqrt(-0.5/update)
-        return next_sigma
+        return next_sigma, w_grad
 
     def compute_stepsize_mean_param(self, dim, i, mGrad):
         acc_grad = self.ada_acc_grad[dim][:, i]
@@ -457,7 +506,8 @@ class SSVI_TF(object):
             print("Random start?", self.randstart)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
-            print("iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|  d_mean  |   d_cov  |", end=" ")
+            print("iteration |   time   |test_rsme |rel-te-err|train_rsme|rel-tr-err|",end=" ")
+            print("  d_mean  |   d_cov  |avg_grad_m|avg_grad_c|", end=" ")
             print("test_nll | train_nll |    VLB   |  E-term  |    KL    ", end=" ")
 
             if self.noise_added:
@@ -471,6 +521,16 @@ class SSVI_TF(object):
         rsme_test, error_test   = self.evaluate_test_error()
         E_term, KL = self.estimate_vlb(self.tensor.train_entries, self.tensor.train_vals)
 
+        avg_mean_grad = [0 for _ in range(len(self.dims))]
+        avg_cov_grad  = [0 for _ in range(len(self.dims))]
+        for dim, s in enumerate(self.dims):
+            avg_grad = np.average([self.grad_norms[dim][i] for i in range(s)], axis=0)
+            avg_mean_grad[dim] = avg_grad[0]
+            avg_cov_grad[dim] = avg_grad[1]
+
+        avg_grad_m = np.average(avg_mean_grad)
+        avg_grad_c = np.average(avg_cov_grad)
+
         print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
               .format(iteration, np.around(current - start,2),\
               np.around(rsme_test, dec), \
@@ -482,6 +542,9 @@ class SSVI_TF(object):
 
         test_nll = self.estimate_negative_log_likelihood(self.tensor.test_entries, self.tensor.test_vals)
         train_nll = self.estimate_negative_log_likelihood(self.tensor.train_entries, self.tensor.train_vals)
+
+        print('{:^10} {:^10}'.format(np.around(avg_grad_m, dec),\
+                                    np.around(avg_grad_c, dec)), end=" ")
 
         print('{:^10} {:^10} {:^10} {:^10} {:^10}'\
               .format(np.around(test_nll, 2), \
@@ -541,7 +604,7 @@ class SSVI_TF(object):
                 samples = np.random.multivariate_normal(m, np.diag(S), size=k)
             else:
                 samples = np.random.multivariate_normal(m, S, size=k)
-            sampled_vectors_prod *= samples
+            sampled_vectors_prod = np.multiply(sampled_vectors_prod, samples)
 
         ms = np.sum(sampled_vectors_prod, axis=1) # shape = (k,)
         if self.noise_added:
@@ -920,7 +983,6 @@ class SSVI_TF(object):
             return 1 if self.true_model_predict_via_sampling(f) > 1/2 else -1
         elif self.datatype == "count":
             return self.true_model_predict_via_sampling(f)
-
 
     def true_model_predict_via_sampling(self, f):
         noise_ratio = self.tensor.noise_ratio

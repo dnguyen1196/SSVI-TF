@@ -13,7 +13,7 @@ from SSVI.SSVI_TF_simple import SSVI_TF_simple
 
 np.random.seed(seed=319)
 
-default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20, "k1" : 64, "k2" : 64}
+default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20}
 
 def get_factorizer_param(model, datatype, diag, using_quadrature):
     set_params = {"eta" : 1, "cov_eta": 0.001}
@@ -26,8 +26,10 @@ def get_init_values(datatype, D):
         mean0 = np.ones((D,))
     elif datatype == "binary":
         mean0 = np.zeros((D,))
+        #
     else:
-        mean0 = np.ones((D,)) * 0.1
+        mean0 = np.ones((D,)) * 0
+        # TODO: does starting position matter
     return {"cov0" : cov0, "mean0" : mean0}
 
 def synthesize_tensor(dims, datatype, using_ratio, noise):
@@ -86,6 +88,9 @@ parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta", default=1.
 parser.add_argument("--rand", action="store_true", help="Using random start")
 parser.add_argument("-meta", "--mean_eta", type=float, help="mean eta", default=1.0)
 parser.add_argument("-dim", "--dimension", nargs='+', required=True, default=[50, 50, 50])
+parser.add_argument("-k1", "--k1", type=int, help="k1 samples", default=64)
+parser.add_argument("-k2", "--k2", type=int, help="k2 samples", default=128)
+
 
 args = parser.parse_args()
 
@@ -129,9 +134,9 @@ params           = {**default_params, **factorizer_param, **init_vals, "tensor" 
 params["cov_eta"] = args.cov_eta
 params["eta"] = args.mean_eta
 params["randstart"] = randstart
-
-params["cov0"] = np.eye(D)
-
+params["cov0"] = np.eye(D)*0.1
+params["k1"] = args.k1
+params["k2"] = args.k2
 
 
 if model == "deterministic":

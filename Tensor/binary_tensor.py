@@ -21,7 +21,9 @@ class binary_tensor(Tensor):
         return matrices
 
     def data_link_fun(self, m):
-        return 1 if m >= self.binary_cutoff else -1
+        f = probs.sigmoid(m)
+        #return 1 if m >= self.binary_cutoff else -1
+        return 1 if np.random.binomial(1,f) == 1 else -1
 
     def actual_value(self, m):
         return m

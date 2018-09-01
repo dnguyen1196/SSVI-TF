@@ -83,5 +83,6 @@ class PoissonDistribution(object):
         temp1 = sigma * (1 - sigma) * (np.divide(y, A) - 1)
         temp2 = y * np.square(sigma) / np.square(A)
         res = temp1 - temp2
-        return np.minimum(0, res)
+        #return np.minimum(0, res)
+        return res
 
