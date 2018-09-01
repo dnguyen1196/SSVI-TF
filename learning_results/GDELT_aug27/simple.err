@@ -1,1 +1,2 @@
 _frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+slurmstepd: *** JOB 33285753 ON m3n49 CANCELLED AT 2018-08-31T10:41:14 DUE TO TIME LIMIT ***
