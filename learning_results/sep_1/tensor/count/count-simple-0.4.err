@@ -1,0 +1,13 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "mini_test.py", line 160, in <module>
+    factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 5, 10, 20,  50, 100, 200])
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 139, in factorize
+    self.report_metrics(iteration, start, mean_change, cov_change)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 543, in report_metrics
+    test_nll = self.estimate_negative_log_likelihood(self.tensor.test_entries, self.tensor.test_vals)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 663, in estimate_negative_log_likelihood
+    expected_ll = np.mean(self.likelihood.pdf(vals[i], fs, s))
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Probability/poisson.py", line 25, in pdf
+    assert(not np.any(pds.isnull(res)))
+AssertionError
