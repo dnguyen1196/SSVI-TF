@@ -64,17 +64,24 @@ class PoissonDistribution(object):
         return res
 
     def log_pdf(self, y, m, s=None):
-        f  = poisson_link(m)
-        t1 = y * np.log(f)
-        t2 = -f
-        t3 = -math.log(np.math.factorial(y))
-        #return poisson.logpmf(y, poisson_link(m))
-        return t1 + t2 + t3
+        #f  = poisson_link(m)
+        #t1 = y * np.log(f)
+        #t2 = -f
+        #t3 = -math.log(np.math.factorial(y))
+        res = poisson.logpmf(y, poisson_link(m))
+        res = np.nan_to_num(res)
+        #return np.maximum(res, 1e-8)
+        #return t1 + t2 + t3
+        return res
 
     def fst_derivative_log_pdf(self, y, f, s=None):
         sigma = sigmoid(f)
         A = poisson_link(f)
         res = sigma * (np.divide(y, A) - 1)
+
+        res = np.nan_to_num(res)
+        #res = np.maximum(res, 1e-8)
+
         return res
 
     def snd_derivative_log_pdf(self, y, f, s=None):
@@ -83,6 +90,8 @@ class PoissonDistribution(object):
         temp1 = sigma * (1 - sigma) * (np.divide(y, A) - 1)
         temp2 = y * np.square(sigma) / np.square(A)
         res = temp1 - temp2
+
+        res = np.nan_to_num(res)
         #return np.minimum(0, res)
         return res
 

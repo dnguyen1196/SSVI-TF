@@ -49,7 +49,7 @@ def sigmoid_scalar(x):
 
 # TODO: check difference choices of epsilon
 
-def poisson_link(f, epsilon=1e-10):
+def poisson_link(f, epsilon=1e-8):
     res = np.log(1 + np.exp(f))
     res = np.nan_to_num(res)
     return np.maximum(res, epsilon)
