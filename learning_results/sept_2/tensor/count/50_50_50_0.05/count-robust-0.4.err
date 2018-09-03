@@ -1,0 +1,17 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "mini_test.py", line 160, in <module>
+    factorizer.factorize(report=args.report, max_iteration=max_iterations, fixed_covariance=fixed_covariance, to_report=[0, 5, 10, 20,  50, 100, 200])
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 120, in factorize
+    self.update_natural_param_batch(dim, col)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 182, in update_natural_param_batch
+    di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py", line 59, in estimate_di_Di_si_batch
+    di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(ys, mean_batch, vjs_batch, ws_batch)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py", line 82, in approximate_di_Di_si_with_second_layer_samplings
+    phi, phi_fst, phi_snd = self.estimate_expected_derivatives_pdf_batch(ys, mean_batch, ws_batch)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_robust.py", line 165, in estimate_expected_derivatives_pdf_batch
+    pdf[num, :]       = np.mean(self.likelihood.pdf(ys[num], fs, s), axis=0)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Probability/poisson.py", line 25, in pdf
+    assert(not np.any(pds.isnull(res)))
+AssertionError

@@ -1,7 +1,7 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/sep_1/tensor/real/
-real deterministic 0
-real simple 0
-real robust 0
-real deterministic 1200
-real simple 1200
-real robust 1200
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/sept_2/tensor/count/50_50_50_full/
+count deterministic 0
+count simple 0
+count robust 0
+count deterministic 0.4
+count simple 0.4
+count robust 0.4
