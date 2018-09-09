@@ -28,6 +28,35 @@ class SSVI_TF_d(SSVI_TF):
             snd_deriv_batch[num] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
 
         return fst_deriv_batch, snd_deriv_batch, None
+    
+    def approximate_di_Di_si_without_second_layer_samplings(self, vjs_batch, ys, mean_batch):
+        num_samples = np.size(mean_batch, axis=0)
+        fst_deriv_batch = np.zeros((num_samples,self.k1))
+        snd_deriv_batch = np.zeros((num_samples,self.k1))
+        s  = self.likelihood_param
+
+        for num in range(num_samples):
+            fs = mean_batch[num, :]
+            fst_deriv_batch[num] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s), axis=0)
+            snd_deriv_batch[num] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
+
+        di = np.zeros((self.D,))
+        if self.diag:
+            Di = np.zeros((self.D,))
+        else:
+            Di = np.zeros((self.D,self.D))
+
+        for num in range(num_samples):
+            # Compute vj * scale
+            vjs_batch_scaled = np.transpose(np.multiply(np.transpose(vjs_batch[num, :, :]), fst_deriv_batch[num, :]))
+            di += np.average(vjs_batch_scaled, axis=0)
+            for k1 in range(self.k1):
+                vj = vjs_batch[num, k1, :]
+                if self.diag:
+                    Di += 0.5 * np.multiply(vj, vj) * snd_deriv_batch[num, k1]/self.k1
+                else:
+                    Di += 0.5 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
+        return di, Di, None
 
     # TODO: implement closed form version
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):

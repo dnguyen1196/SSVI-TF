@@ -176,10 +176,22 @@ class SSVI_TF(object):
         coords = np.array([entry[0] for entry in observed_subset])
         ys = np.array([entry[1] for entry in observed_subset])
 
-        if self.likelihood_type == "normal":
-            di, Di, si = self.estimate_di_Di_si_complete_conditional_batch(dim, i, coords, ys, m, S)
-        else:
-            di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+        #if self.likelihood_type == "normal":
+        #    di, Di, si = self.estimate_di_Di_si_complete_conditional_batch(dim, i, coords, ys, m, S)
+        #else:
+        di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+
+        # NOTE: do multiple di, Di, si computation to verify the variance problem
+        #k = 16
+        #di_all     = np.zeros((k+1, self.D))
+        #di_all[0, :] = di
+        #for j in range(k):
+        #    d, D, s = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+        #    di_all[j+1, :] = d   
+        #di_var = np.var(di_all, axis=0)
+        #di_mean = np.mean(di_all, axis=0)
+        #print("variance: ", np.linalg.norm(di_var), "mean:", np.linalg.norm(di_mean)) 
+        #di = di_mean
 
         scale = len(observed) / len(observed_subset)
         Di *= scale
@@ -191,8 +203,6 @@ class SSVI_TF(object):
         assert(not np.any(np.isinf(Di)))
 
         # Compute next covariance and mean
-        # TODO: keep track of the gradient here as well, make the functions return
-        # both the next iterate and the gradient
         if self.diag:
             S_next, S_grad   = self.update_cov_param_diag(dim, i, m, S, di, Di)
             m_next, m_grad   = self.update_mean_param_diag(dim, i, m, S, di, Di)
@@ -207,10 +217,9 @@ class SSVI_TF(object):
         assert(not np.any(np.iscomplex(S_next)))
         assert(not np.any(np.isnan(S_next)))
         assert(not np.any(np.isinf(S_next)))
-        #assert(not np.any(np.iscomplex(m_next)))
+        assert(not np.any(np.iscomplex(m_next)))
 
         if self.noise_added:
-            # TODO: what to do with the grad here
             w_sigma, _     = self.update_sigma_param(si, scale)
             self.w_changes = np.abs(w_sigma - self.w_sigma)
             self.w_sigma   = w_sigma
@@ -226,6 +235,15 @@ class SSVI_TF(object):
 
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         """
+        NOTE: robust model will have a separate implementation of this function
+        """
+        #return self.estimate_di_Di_si_batch_naive(dim, i, coords, ys, m, S)
+        return self.estimate_di_Di_si_batch_control_variate(dim, i, coords, ys, m, S)
+        #return self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+
+
+    def estimate_di_Di_si_batch_naive(self, dim, i, coords, ys, m, S):
+        """
         :param dim:
         :param i:
         :param coords:
@@ -233,7 +251,41 @@ class SSVI_TF(object):
         :param m:
         :param S:
         :return:
+        Note that robust model will have a completely different implementation of this
+        function
+        """
+        
+        num_subsamples     = np.size(coords, axis=0) # Number of subsamples
+        othercols_left     = coords[:, : dim]
+        othercols_right    = coords[:, dim + 1 :]
+        othercols_concat   = np.concatenate((othercols_left, othercols_right), axis=1)
+        alldims            = list(range(self.order))
+        otherdims          = alldims[:dim]
+        otherdims.extend(alldims[dim + 1 : ])
+        # Shape of vjs_batch would be (num_subsamples, k1, D)
+        # Sample vj, tk, ...
+        vjs_batch  = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
+        ui_samples = np.random.multivariate_normal(m, S, size=(num_subsamples, self.k1))
+        assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+        assert(vjs_batch.shape == (num_subsamples, self.k1, self.D))
+        mean_batch = np.sum(np.multiply(ui_samples, vjs_batch), axis=2) # (num_samples, k1)
+        if self.noise_added:
+            var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
+            ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
+            di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
+        else: # Deterministic model
+            di, Di, si = self.approximate_di_Di_si_without_second_layer_samplings(vjs_batch, ys, mean_batch)
+        return di,  Di, si
 
+    def estimate_di_Di_si_batch_formulaic(self, dim, i, coords, ys, m, S):
+        """
+        :param dim:
+        :param i:
+        :param coords:
+        :param ys:
+        :param m:
+        :param S:
+        :return:
         Note that robust model will have a completely different implementation of this
         function
         """
@@ -250,7 +302,6 @@ class SSVI_TF(object):
         # Shape of vjs_batch would be (num_subsamples, k1, D)
         # Sample vj, tk, ...
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
-
         assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
 
         # Sample rayleigh noise
@@ -258,34 +309,159 @@ class SSVI_TF(object):
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
         else:
             ws_batch   = np.zeros((num_subsamples, self.k1))
-
         mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
         var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
-
-        #for num in range(num_subsamples):
-        #    vs = vjs_batch[num, :, :] # shape (k1, D)
-        #    if self.diag:
-        #        var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(np.diag(S), vs)), axis=0)
-        #    else:
-        #        var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
-
-        #di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
-
         for num in range(num_subsamples):
-            vs = vjs_batch[num, :, :] # shape(k1, D)
-
-            for k in range(self.k1):
-                v = vs[k, :]
-                if self.diag:
-                    s = np.sum(np.multiply(S, np.square(v)))
-                else:
-                    s = np.dot(np.transpose(v), np.dot(S, v))
-                var_batch[num, k] = s
-                #var_batch[num, k] = 0
-
+            vs = vjs_batch[num, :, :] # shape (k1, D)
+            if self.diag:
+                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(np.diag(S), vs)), axis=0)
+            else:
+                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
         return di, Di, si
 
+    def estimate_di_Di_si_batch_control_variate(self, dim, i, coords, ys, m, S):
+        """
+        :param dim
+        :param
+        :param
+
+        We're trying to compute expectation of V = (vj * tk ...) d/df log p(y|f)
+        We're trying to find A = E[V] but samples might have too high variance for practical purpose
+
+        Using control variate W = [vj * vk * ... ] * fijk
+        B = E[W] = ([mm^T + S] * ... )m with a closed form
+
+        sigma_w = 1/L sum(W_k - B) -> this might have close form
+        A*      = 1/L sum(V_k)     -> high variance approximation
+        cvw     = 1/L sum(Vk - A*)(Wk - B)
+        alpha   = cvw / sigma_w
+
+        Ahat    = A* - alpha * 1/L * sum (Wk - B)
+        """
+        num_subsamples     = np.size(coords, axis=0) # Number of subsamples
+        othercols_left     = coords[:, : dim]
+        othercols_right    = coords[:, dim + 1 :]
+        othercols          = np.concatenate((othercols_left, othercols_right), axis=1)
+        alldims            = list(range(self.order))
+        otherdims          = alldims[:dim]
+        otherdims.extend(alldims[dim + 1 : ])
+        _, Di, si = self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+        di = np.zeros((self.D,))
+        for k in range(num_subsamples):
+            di += self.estimate_di_control_variate(otherdims, othercols[k,:], ys[k], m, S)
+        assert(not np.any(np.isnan(di)))
+        return di, Di, si
+
+
+    def estimate_di_control_variate(self, otherdims, othercols, y, m, S):
+        ndim = np.size(otherdims)
+        othermeans = np.zeros((ndim, self.D))
+        othercovs  = np.zeros((ndim, self.D, self.D))
+        for i, dim in enumerate(otherdims):
+            m, S = self.posterior.get_vector_distribution(dim, othercols[i])
+            othermeans[i, :] = m
+            if self.diag:
+                othercovs[i, :, :] = np.diag(S)
+            else:
+                othercovs[i, :, :] = S
+
+        Wks = self.sample_Wk(othermeans, othercovs, m, S)
+        assert(not np.any(np.isnan(Wks)))
+        Vks = self.sample_Vk(othermeans, othercovs, m, S, y)
+        #print("Wks", Wks)
+        #print("Vks", Vks)
+        assert(not np.any(np.isnan(Vks)))
+        B = self.compute_B_closed_form(othermeans, othercovs, m)
+        #print("B", B)
+        assert(not np.any(np.isnan(B)))
+        sigma = self.compute_sigma_sqr(Wks, B)
+        assert(not np.any(np.isnan(sigma)))
+        cvw   = self.compute_covariance_V_W(Vks, Wks, B)
+        #print("cvw", cvw)
+        assert(not np.any(np.isnan(cvw)))
+        alpha = self.compute_alpha(cvw, sigma)
+        assert(not np.any(np.isnan(alpha)))
+        di    = np.mean(Vks, axis=0) - alpha * np.mean(Wks - B, axis=0)
+        return di
+
+
+    def sample_Wk(self, otherms, othercovs, m, S):
+        ndim = np.size(otherms, axis=0)
+        Wks  = np.ones((self.k1, self.D))
+        for k in range(ndim):
+            m = otherms[k, :]
+            C = othercovs[k, :, :]
+            Wks *= np.random.multivariate_normal(m, C, size=(self.k1,))
+        if np.all(m == 0):
+            l = np.full_like(m, 1e-4)
+        else:
+            l = m
+        fs = np.dot(Wks, l) # (k1,)
+        if self.noise_added:
+            fs = np.random.normal(fs, self.w_sigma)
+        # We want to multiply each row by the corresponding f_ijk 
+        res = Wks * fs[:,np.newaxis]
+        assert(res.shape == (self.k1,self.D))
+        # shape(k1,)
+        return res
+
+
+    def sample_Vk(self, otherms, othercovs, m, S, y):
+        ndim = np.size(otherms, axis=0)
+        Vks  = np.ones((self.k1, self.D))
+        for k in range(ndim):
+            m = otherms[k, :]
+            C = othercovs[k, :, :]
+            Vks *= np.random.multivariate_normal(m, C, size=(self.k1,))
+        # (k1,D)
+        meanf = np.dot(Vks, m)
+
+        # NOTE: we want to compute an array of vj^Svj
+        # The short cut is take np.inner(S, vj) -> (D,k1)
+        # then take product with vj again 
+        if self.diag:
+            variances = np.sum(np.multiply(Vks.transpose(), np.inner(np.diag(S), Vks)), axis=0)
+        else:
+            variances = np.sum(np.multiply(Vks.transpose(), np.inner(S, Vks)), axis=0)
+
+        fijks = np.random.normal(meanf, variances, size=(self.k2, self.k1))
+        s = self.likelihood_param 
+        # shape (k1,)
+        fst_deriv = np.average(self.likelihood.fst_derivative_log_pdf(y, fijks, s), axis=0)
+
+        # multiply across rows
+        # NOTE:
+        res = Vks * fst_deriv[:, np.newaxis]
+        return res
+
+    def compute_B_closed_form(self, otherms, othercovs, m):
+        B = np.ones((self.D, self.D))
+        ndim = np.size(otherms, axis=0)
+        for k in range(ndim):
+            v = otherms[k, :]
+            C = othercovs[k, :, :]
+            B *= np.outer(v,v) + C
+        return np.dot(B, m)
+
+    def compute_covariance_V_W(self, Vks, Wks, B):
+        """
+        Vks shape == (k1,D)
+        Wks shape == (k1,D)
+        B = (k1)
+        """
+        A = np.average(Vks, axis=0) #shape(D,)
+        Vk_A = Vks - A #shape(k1,D)
+        Wk_B = Wks - B #shape(k1,D)
+        res = np.mean(Vk_A * Wk_B, axis=0) # average down shape(D)
+        return res
+    
+    def compute_sigma_sqr(self, Wks, B):
+        return np.mean(np.square(Wks - B), axis=0)
+
+    def compute_alpha(self, cvw, sigma):
+        return cvw / sigma
+    
     @abstractmethod
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         raise NotImplementedError
@@ -345,10 +521,10 @@ class SSVI_TF(object):
             raise Exception("Unidentified update formula for covariance param")
         return m_next, meanGrad
 
+
     def update_cov_param(self, dim, i, m, S, di_acc,  Di_acc):
         sigma = self.pSigma[dim]
         pSigma_inv = np.diag(np.full((self.D,), 1/sigma))
-
         if self.cov_update == "S":
             L = cholesky(S)
             covGrad = np.triu(inv(np.multiply(L, np.eye(self.D))) \
@@ -357,15 +533,12 @@ class SSVI_TF(object):
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
             L_next  = L + covStep * covGrad
             S_next  = np.dot(L, np.transpose(L))
-
         elif self.cov_update == "N":
             covGrad = (pSigma_inv - 2 * Di_acc)
             covStep = self.compute_stepsize_cov_param(dim, i, covGrad)
             S_next = inv((1 - covStep) * inv(S) + np.multiply(covStep, covGrad))
-
         else:
             raise Exception("Unidentified update formula for covariance param")
-
         #S_next = S_next + np.eye(self.D) * self.cov_eta
         w,v = np.linalg.eigh(S_next)
         w   = np.maximum(np.real(w), self.min_eigenval)
@@ -430,15 +603,8 @@ class SSVI_TF(object):
         self.ada_acc_grad[dim][:, i] += grad_sqr
 
         return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        #if self.likelihood_type != "poisson":
-        #    return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
-        #else:
-        #    return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
 
     def compute_stepsize_cov_param(self, dim, i, covGrad):
-        #if self.likelihood_type == "poisson":
-        #    return self.cov_eta/(self.time_step[dim] + 1)
-
         return self.cov_eta/(self.time_step[dim] + 1)
 
     def compute_step_size_cov_param_diag(self, dim, i, covGrad):
@@ -464,9 +630,6 @@ class SSVI_TF(object):
         else:
             cov_change  = np.linalg.norm(S_next - S)
         self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
-        #d_mean = self.max_changes[dim][0]
-        #d_cov = self.max_changes[dim][1]
-        #self.max_changes[dim] = [max(d_mean, mean_change), max(d_cov, cov_change)]
 
     def sample_vjs_batch(self, cols_batch, dims_batch, k):
         num_subsamples = np.size(cols_batch, axis=0)
@@ -567,18 +730,13 @@ class SSVI_TF(object):
             print("Using diagonal covariance:", self.diag)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
-
-            #print("iteration |   time   |test_rsme |train_rsme|  d_mean  |   d_cov  |")
-
             print("iteration |   time   |test_rsme|  d_mean  |   d_cov  |")
 
         current = time.time()
         dec = 4
-
-            #rsme_train, error_train = self.evaluate_train_error()
+        
         rsme_test, error_test   = self.evaluate_test_error()
 
-            #print("{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current - start,2), rsme_test, rsme_train, np.around(mean_change, dec), np.around(cov_change, dec)))
         print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), np.around(rsme_test,dec), np.around(mean_change, dec), np.around(cov_change, dec)))
 
     def estimate_vlb(self, entries, values):
@@ -613,7 +771,7 @@ class SSVI_TF(object):
         else:
             fs = ms
         s = self.likelihood_param
-        expected_ll = np.mean(self.likelihood.log_pdf(val, self.link_fun(fs), s))
+        expected_ll = np.mean(self.likelihood.log_pdf(val, fs, s))
         return expected_ll
 
     def estimate_KL_divergence(self):
@@ -685,12 +843,10 @@ class SSVI_TF(object):
         return d_mean, d_cov
 
     def evaluate_train_error(self):
-        # error = self.evaluate_error(self.tensor.train_entries, self.tensor.train_vals)
         rsme, error = self.evaluate_RSME(self.tensor.train_entries, self.tensor.train_vals)
         return rsme, error
 
     def evaluate_test_error(self):
-        # error = self.evaluate_error(self.tensor.test_entries, self.tensor.test_vals)
         rsme, error = self.evaluate_RSME(self.tensor.test_entries, self.tensor.test_vals)
         return rsme, error
 
@@ -871,11 +1027,11 @@ class SSVI_TF(object):
         if self.noise_added:
             ws = np.random.rayleigh(self.w_sigma**2, size=self.predict_num_samples)
             fs = np.random.normal(ms, ws, size=(self.predict_num_samples))
-            fs = self.link_fun(fs)
+            #fs = self.link_fun(fs)
             counts = self.likelihood.sample(fs, (self.predict_num_samples))
         else:
             fs = ms
-            fs = self.link_fun(fs)
+            #fs = self.link_fun(fs)
             counts = self.likelihood.sample(fs, (self.predict_num_samples))
 
         return np.mean(counts)
@@ -898,7 +1054,8 @@ class SSVI_TF(object):
             fs = np.random.normal(ms, ws, size=(self.predict_num_samples, self.predict_num_samples))
         else: # deterministic model
             fs = ms
-
+        
+        # TODO: this is not doing sampling
         predict = self.link_fun(fs)
         return np.mean(predict)
 
@@ -994,8 +1151,7 @@ class SSVI_TF(object):
         num_samples = 50
         ws = np.random.normal(0, w, size=(num_samples,))
         f_noised = np.add(f, ws)
-        ps = self.link_fun(f_noised)
-        p = np.mean(ps)
+        p = np.mean(self.link_fun(f_noised))
         #return p
         return np.rint(p)
 

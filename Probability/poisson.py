@@ -13,7 +13,8 @@ class PoissonDistribution(object):
         return "PoissonDistribution"
 
     def sample(self, m, s=None, k=1):
-        return np.random.poisson(m, size=k)
+        f = poisson_link(m)
+        return np.random.poisson(f, size=k)
 
     def pdf(self, y, m, S=None):
         A = poisson_link(m)
