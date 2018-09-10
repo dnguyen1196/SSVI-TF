@@ -182,16 +182,17 @@ class SSVI_TF(object):
         di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
         # NOTE: do multiple di, Di, si computation to verify the variance problem
-        #k = 16
-        #di_all     = np.zeros((k+1, self.D))
-        #di_all[0, :] = di
-        #for j in range(k):
-        #    d, D, s = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
-        #    di_all[j+1, :] = d   
-        #di_var = np.var(di_all, axis=0)
-        #di_mean = np.mean(di_all, axis=0)
-        #print("variance: ", np.linalg.norm(di_var), "mean:", np.linalg.norm(di_mean)) 
-        #di = di_mean
+        if True:
+            k = 16
+            di_all     = np.zeros((k+1, self.D))
+            di_all[0, :] = di
+            for j in range(k):
+                d, D, s = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
+                di_all[j+1, :] = d   
+            di_var = np.var(di_all, axis=0)
+            di_mean = np.mean(di_all, axis=0)
+            print("variance: ", np.linalg.norm(di_var), "mean:", np.linalg.norm(di_mean)) 
+            di = di_mean
 
         scale = len(observed) / len(observed_subset)
         Di *= scale
@@ -233,11 +234,14 @@ class SSVI_TF(object):
         # Update the change
         self.posterior.update_vector_distribution(dim, i, m_next, S_next)
 
+
     def estimate_di_Di_si_batch(self, dim, i, coords, ys, m, S):
         """
         NOTE: robust model will have a separate implementation of this function
         """
         #return self.estimate_di_Di_si_batch_naive(dim, i, coords, ys, m, S)
+        #return self.estimate_di_Di_si_batch_naive_control_variate(dim, i, coords, ys, m, S)
+
         return self.estimate_di_Di_si_batch_control_variate(dim, i, coords, ys, m, S)
         #return self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
 
@@ -253,8 +257,7 @@ class SSVI_TF(object):
         :return:
         Note that robust model will have a completely different implementation of this
         function
-        """
-        
+        """       
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
         othercols_left     = coords[:, : dim]
         othercols_right    = coords[:, dim + 1 :]
@@ -276,6 +279,77 @@ class SSVI_TF(object):
         else: # Deterministic model
             di, Di, si = self.approximate_di_Di_si_without_second_layer_samplings(vjs_batch, ys, mean_batch)
         return di,  Di, si
+
+
+    def estimate_di_Di_si_batch_naive_control_variate(self, dim, i, coords, ys, m, S):
+        """
+        """
+        num_subsamples     = np.size(coords, axis=0) # Number of subsamples
+        othercols_left     = coords[:, : dim]
+        othercols_right    = coords[:, dim + 1 :]
+        othercols          = np.concatenate((othercols_left, othercols_right), axis=1)
+        alldims            = list(range(self.order))
+        otherdims          = alldims[:dim]
+        otherdims.extend(alldims[dim + 1 : ])
+        _, Di, si = self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+        di = np.zeros((self.D,))
+        for k in range(num_subsamples):
+            di += self.estimate_di_control_variate_naive(otherdims, othercols[k,:], ys[k], m, S)
+        assert(not np.any(np.isnan(di)))
+        return di, Di, si
+ 
+
+    def estimate_di_control_variate_naive(self, otherdims, othercols, y, m, S):
+        ndim = np.size(otherdims)
+        othermeans = np.zeros((ndim, self.D))
+        othercovs  = np.zeros((ndim, self.D, self.D))
+        for i, dim in enumerate(otherdims):
+            m, S = self.posterior.get_vector_distribution(dim, othercols[i])
+            othermeans[i, :] = m
+            if self.diag:
+                othercovs[i, :, :] = np.diag(S)
+            else:
+                othercovs[i, :, :] = S
+
+        Wks = self.sample_Wk(othermeans, othercovs, m, S)
+        assert(not np.any(np.isnan(Wks)))
+        Vks = self.sample_Vk_naive(othermeans, othercovs, m, S, y)
+        assert(not np.any(np.isnan(Vks)))
+        B = self.compute_B_closed_form(othermeans, othercovs, m)
+        assert(not np.any(np.isnan(B)))
+        sigma = self.compute_sigma_sqr(Wks, B)
+        assert(not np.any(np.isnan(sigma)))
+        cvw   = self.compute_covariance_V_W(Vks, Wks, B)
+        assert(not np.any(np.isnan(cvw)))
+        alpha = self.compute_alpha(cvw, sigma)
+        assert(not np.any(np.isnan(alpha)))
+        di    = np.mean(Vks, axis=0) - alpha * np.mean(Wks - B, axis=0)
+        return di
+   
+
+    def sample_Vk_naive(self, otherms, othercovs, m, S, y):
+        ndim = np.size(otherms, axis=0)
+        Vks  = np.ones((self.k1, self.D))
+        for k in range(ndim):
+            m = otherms[k, :]
+            C = othercovs[k, :, :]
+            Vks *= np.random.multivariate_normal(m, C, size=(self.k1,))
+        #(k1,D)
+        #Vks *= np.random.multivariate_normal(m, S, size=(self.k1,))
+        meanf = np.sum(Vks * np.random.multivariate_normal(m, S, size=(self.k1,)), axis=1)
+        s = self.likelihood_param
+        if not self.noise_added:
+            fst_deriv = self.likelihood.fst_derivative_log_pdf(y, meanf, s)
+            return Vks * fst_deriv[:, np.newaxis]
+
+        variances = np.random.rayleigh(self.w_sigma**2, size=(self.k1,))
+        fijks = np.random.normal(meanf, variances, size=(self.k2, self.k1))
+        s = self.likelihood_param 
+        #shape (k1,)
+        fst_deriv = np.average(self.likelihood.fst_derivative_log_pdf(y, fijks, s), axis=0)
+        res = Vks * fst_deriv[:, np.newaxis]
+        return res
+
 
     def estimate_di_Di_si_batch_formulaic(self, dim, i, coords, ys, m, S):
         """
@@ -319,6 +393,7 @@ class SSVI_TF(object):
                 var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
         return di, Di, si
+
 
     def estimate_di_Di_si_batch_control_variate(self, dim, i, coords, ys, m, S):
         """
@@ -393,11 +468,11 @@ class SSVI_TF(object):
             m = otherms[k, :]
             C = othercovs[k, :, :]
             Wks *= np.random.multivariate_normal(m, C, size=(self.k1,))
-        if np.all(m == 0):
-            l = np.full_like(m, 1e-4)
-        else:
-            l = m
-        fs = np.dot(Wks, l) # (k1,)
+        #if np.all(m == 0):
+        #    l = np.full_like(m, 1e-4)
+        #else:
+        #    l = m
+        fs = np.dot(Wks, m) # (k1,)
         if self.noise_added:
             fs = np.random.normal(fs, self.w_sigma)
         # We want to multiply each row by the corresponding f_ijk 
