@@ -12,23 +12,20 @@ class SSVI_TF_d(SSVI_TF):
         super(SSVI_TF_d, self).__init__(tensor, rank, mean_update, cov_update, noise_update, diag, \
                  mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta, randstart)
 
+
     def estimate_expected_derivative_batch(self, ys, mean_batch, cov_batch, ws_batch=None):
         num_samples     = np.size(mean_batch, axis=0)
-
         assert(self.k1 == np.size(mean_batch, axis=1))
-
         fst_deriv_batch = np.zeros((num_samples,self.k1))
         snd_deriv_batch = np.zeros((num_samples,self.k1))
-
         s  = self.likelihood_param
-
         for num in range(num_samples):
             fs = np.random.normal(mean_batch[num, :], cov_batch[num, :], size=(self.k2, self.k1))
             fst_deriv_batch[num] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s), axis=0)
             snd_deriv_batch[num] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
-
         return fst_deriv_batch, snd_deriv_batch, None
-    
+
+
     def approximate_di_Di_si_without_second_layer_samplings(self, vjs_batch, ys, mean_batch):
         num_samples = np.size(mean_batch, axis=0)
         fst_deriv_batch = np.zeros((num_samples,self.k1))
@@ -39,7 +36,6 @@ class SSVI_TF_d(SSVI_TF):
             fs = mean_batch[num, :]
             fst_deriv_batch[num] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s), axis=0)
             snd_deriv_batch[num] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
-
         di = np.zeros((self.D,))
         if self.diag:
             Di = np.zeros((self.D,))

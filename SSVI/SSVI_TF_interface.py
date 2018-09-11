@@ -246,6 +246,12 @@ class SSVI_TF(object):
         #return self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
 
 
+    """
+    Note the two different choices of control variate
+    W  = (vj * tk) fijk
+    H  = d/dui log N(ui|mui, Sui)
+    """
+
     def estimate_di_Di_si_batch_naive(self, dim, i, coords, ys, m, S):
         """
         :param dim:
@@ -283,6 +289,8 @@ class SSVI_TF(object):
 
     def estimate_di_Di_si_batch_naive_control_variate(self, dim, i, coords, ys, m, S):
         """
+        :param
+        :param
         """
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
         othercols_left     = coords[:, : dim]
@@ -291,56 +299,62 @@ class SSVI_TF(object):
         alldims            = list(range(self.order))
         otherdims          = alldims[:dim]
         otherdims.extend(alldims[dim + 1 : ])
-        _, Di, si = self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+        di_uncontrolled, Di, si = self.estimate_di_Di_si_batch_naive(dim, i, coords, ys, m, S)
+        # Compute di specifically using control variate
         di = np.zeros((self.D,))
         for k in range(num_subsamples):
             di += self.estimate_di_control_variate_naive(otherdims, othercols[k,:], ys[k], m, S)
         assert(not np.any(np.isnan(di)))
-        return di, Di, si
- 
+        #print("di - di_uncontrolled", np.linalg.norm(di - di_uncontrolled))
+        return di_uncontrolled, Di, si
+        #return di, Di, si
 
     def estimate_di_control_variate_naive(self, otherdims, othercols, y, m, S):
         ndim = np.size(otherdims)
         othermeans = np.zeros((ndim, self.D))
         othercovs  = np.zeros((ndim, self.D, self.D))
         for i, dim in enumerate(otherdims):
-            m, S = self.posterior.get_vector_distribution(dim, othercols[i])
-            othermeans[i, :] = m
+            mvj, Svj = self.posterior.get_vector_distribution(dim, othercols[i])
+            othermeans[i, :] = mvj
             if self.diag:
-                othercovs[i, :, :] = np.diag(S)
+                othercovs[i, :, :] = np.diag(Svj)
             else:
-                othercovs[i, :, :] = S
+                othercovs[i, :, :] = Svj
+        # NOTE the appropriate choice of control variables
+        #Wks = self.sample_Wk(othermeans, othercovs, m, S)
+        #B = self.compute_expected_W(othermeans, othercovs, m)
 
-        Wks = self.sample_Wk(othermeans, othercovs, m, S)
-        assert(not np.any(np.isnan(Wks)))
+        Wks = self.sample_Hk(m, S)
+        B = self.compute_expected_H()
+
         Vks = self.sample_Vk_naive(othermeans, othercovs, m, S, y)
-        assert(not np.any(np.isnan(Vks)))
-        B = self.compute_B_closed_form(othermeans, othercovs, m)
-        assert(not np.any(np.isnan(B)))
         sigma = self.compute_sigma_sqr(Wks, B)
-        assert(not np.any(np.isnan(sigma)))
+        assert(sigma.shape == (self.D,))
         cvw   = self.compute_covariance_V_W(Vks, Wks, B)
-        assert(not np.any(np.isnan(cvw)))
+        assert(cvw.shape == (self.D,))
         alpha = self.compute_alpha(cvw, sigma)
-        assert(not np.any(np.isnan(alpha)))
-        di    = np.mean(Vks, axis=0) - alpha * np.mean(Wks - B, axis=0)
+        assert(alpha.shape == (self.D,))
+        temp =  np.multiply(alpha, np.mean(Wks - B, axis=0))
+        di    = np.mean(Vks, axis=0) - temp
+        assert(di.shape == (self.D,))
         return di
-   
+
 
     def sample_Vk_naive(self, otherms, othercovs, m, S, y):
         ndim = np.size(otherms, axis=0)
         Vks  = np.ones((self.k1, self.D))
         for k in range(ndim):
-            m = otherms[k, :]
-            C = othercovs[k, :, :]
-            Vks *= np.random.multivariate_normal(m, C, size=(self.k1,))
+            mvj = otherms[k, :]
+            Cvj = othercovs[k, :, :]
+            Vks *= np.random.multivariate_normal(mvj, Cvj, size=(self.k1,))
+
         #(k1,D)
-        #Vks *= np.random.multivariate_normal(m, S, size=(self.k1,))
         meanf = np.sum(Vks * np.random.multivariate_normal(m, S, size=(self.k1,)), axis=1)
         s = self.likelihood_param
         if not self.noise_added:
             fst_deriv = self.likelihood.fst_derivative_log_pdf(y, meanf, s)
             return Vks * fst_deriv[:, np.newaxis]
+            #return Vks * fst_deriv
 
         variances = np.random.rayleigh(self.w_sigma**2, size=(self.k1,))
         fijks = np.random.normal(meanf, variances, size=(self.k2, self.k1))
@@ -421,12 +435,13 @@ class SSVI_TF(object):
         alldims            = list(range(self.order))
         otherdims          = alldims[:dim]
         otherdims.extend(alldims[dim + 1 : ])
-        _, Di, si = self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+        di_uncontrolled, Di, si = self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
         di = np.zeros((self.D,))
         for k in range(num_subsamples):
             di += self.estimate_di_control_variate(otherdims, othercols[k,:], ys[k], m, S)
         assert(not np.any(np.isnan(di)))
-        return di, Di, si
+        #return di, Di, si
+        return di_uncontrolled, Di, si
 
 
     def estimate_di_control_variate(self, otherdims, othercols, y, m, S):
@@ -434,29 +449,25 @@ class SSVI_TF(object):
         othermeans = np.zeros((ndim, self.D))
         othercovs  = np.zeros((ndim, self.D, self.D))
         for i, dim in enumerate(otherdims):
-            m, S = self.posterior.get_vector_distribution(dim, othercols[i])
-            othermeans[i, :] = m
+            mvj, Svj = self.posterior.get_vector_distribution(dim, othercols[i])
+            othermeans[i, :] = mvj
             if self.diag:
-                othercovs[i, :, :] = np.diag(S)
+                othercovs[i, :, :] = np.diag(Svj)
             else:
-                othercovs[i, :, :] = S
+                othercovs[i, :, :] = Svj
 
-        Wks = self.sample_Wk(othermeans, othercovs, m, S)
-        assert(not np.any(np.isnan(Wks)))
+        # NOTE the appropriate control variate
+        #Wks = self.sample_Wk(othermeans, othercovs, m, S)
+        #B   = self.compute_expected_W(othermeans, othercovs, m)
+
+        Wks = self.sample_Hk(m, S)
+        B   = self.compute_expected_H()
+
         Vks = self.sample_Vk(othermeans, othercovs, m, S, y)
-        #print("Wks", Wks)
-        #print("Vks", Vks)
-        assert(not np.any(np.isnan(Vks)))
-        B = self.compute_B_closed_form(othermeans, othercovs, m)
-        #print("B", B)
-        assert(not np.any(np.isnan(B)))
         sigma = self.compute_sigma_sqr(Wks, B)
-        assert(not np.any(np.isnan(sigma)))
         cvw   = self.compute_covariance_V_W(Vks, Wks, B)
-        #print("cvw", cvw)
-        assert(not np.any(np.isnan(cvw)))
         alpha = self.compute_alpha(cvw, sigma)
-        assert(not np.any(np.isnan(alpha)))
+        assert(alpha.shape == (self.D,))
         di    = np.mean(Vks, axis=0) - alpha * np.mean(Wks - B, axis=0)
         return di
 
@@ -465,9 +476,9 @@ class SSVI_TF(object):
         ndim = np.size(otherms, axis=0)
         Wks  = np.ones((self.k1, self.D))
         for k in range(ndim):
-            m = otherms[k, :]
-            C = othercovs[k, :, :]
-            Wks *= np.random.multivariate_normal(m, C, size=(self.k1,))
+            mvj = otherms[k, :]
+            Cvj = othercovs[k, :, :]
+            Wks *= np.random.multivariate_normal(mvj, Cvj, size=(self.k1,))
         #if np.all(m == 0):
         #    l = np.full_like(m, 1e-4)
         #else:
@@ -477,6 +488,7 @@ class SSVI_TF(object):
             fs = np.random.normal(fs, self.w_sigma)
         # We want to multiply each row by the corresponding f_ijk 
         res = Wks * fs[:,np.newaxis]
+        #res = Wks * fs
         assert(res.shape == (self.k1,self.D))
         # shape(k1,)
         return res
@@ -486,9 +498,9 @@ class SSVI_TF(object):
         ndim = np.size(otherms, axis=0)
         Vks  = np.ones((self.k1, self.D))
         for k in range(ndim):
-            m = otherms[k, :]
-            C = othercovs[k, :, :]
-            Vks *= np.random.multivariate_normal(m, C, size=(self.k1,))
+            mvj = otherms[k, :]
+            Cvj = othercovs[k, :, :]
+            Vks *= np.random.multivariate_normal(mvj, Cvj, size=(self.k1,))
         # (k1,D)
         meanf = np.dot(Vks, m)
 
@@ -499,25 +511,27 @@ class SSVI_TF(object):
             variances = np.sum(np.multiply(Vks.transpose(), np.inner(np.diag(S), Vks)), axis=0)
         else:
             variances = np.sum(np.multiply(Vks.transpose(), np.inner(S, Vks)), axis=0)
-
+        assert(variances.shape == (self.k1,))
         fijks = np.random.normal(meanf, variances, size=(self.k2, self.k1))
-        s = self.likelihood_param 
+        s = self.likelihood_param
         # shape (k1,)
         fst_deriv = np.average(self.likelihood.fst_derivative_log_pdf(y, fijks, s), axis=0)
-
-        # multiply across rows
-        # NOTE:
         res = Vks * fst_deriv[:, np.newaxis]
         return res
 
-    def compute_B_closed_form(self, otherms, othercovs, m):
+
+    """
+    Helper functions when using control variate: W = (vj * tk) fijk
+    """
+    def compute_expected_W(self, otherms, othercovs, m):
         B = np.ones((self.D, self.D))
         ndim = np.size(otherms, axis=0)
         for k in range(ndim):
             v = otherms[k, :]
             C = othercovs[k, :, :]
             B *= np.outer(v,v) + C
-        return np.dot(B, m)
+        return np.dot(B, m) 
+
 
     def compute_covariance_V_W(self, Vks, Wks, B):
         """
@@ -528,18 +542,39 @@ class SSVI_TF(object):
         A = np.average(Vks, axis=0) #shape(D,)
         Vk_A = Vks - A #shape(k1,D)
         Wk_B = Wks - B #shape(k1,D)
+        assert(Vk_A.shape == (self.k1, self.D))
+        assert(Wk_B.shape == (self.k1, self.D))
         res = np.mean(Vk_A * Wk_B, axis=0) # average down shape(D)
+        assert(res.shape ==  (self.D,))
         return res
-    
+
+    """
+    Helper functions when using control variate: H = d/dui log N(ui|mui, Sui)
+    """
+    def sample_Hk(self, m, S):
+        uis = np.random.multivariate_normal(m, S, size=(self.k1,))
+        uis_mui = uis - m
+        hs = np.dot(uis_mui, np.transpose(np.linalg.inv(S)))
+        assert(hs.shape == (self.k1, self.D))
+        return hs 
+
+
+    def compute_expected_H(self):
+        return np.zeros((self.D,))
+
+
     def compute_sigma_sqr(self, Wks, B):
         return np.mean(np.square(Wks - B), axis=0)
 
+
     def compute_alpha(self, cvw, sigma):
-        return cvw / sigma
-    
+        return np.divide(cvw, sigma)
+
+
     @abstractmethod
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         raise NotImplementedError
+
 
     def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
         """
@@ -575,6 +610,7 @@ class SSVI_TF(object):
                     Di += 0.5 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
 
         return di, Di, si
+
 
     def update_mean_param(self, dim, i, m, S, di_acc, Di_acc):
         sigma = self.pSigma[dim]
@@ -620,6 +656,7 @@ class SSVI_TF(object):
         S_next = np.dot(v, np.dot(np.diag(w),v.transpose()))
         return S_next, covGrad
 
+
     def update_mean_param_diag(self, dim, i, m, S, di_acc, Di_acc):
         sigma = self.pSigma[dim]
         pSigma_inv = np.full((self.D,), 1/sigma)
@@ -639,6 +676,7 @@ class SSVI_TF(object):
             raise Exception("Unidentified update formula for covariance param")
 
         return m_next, meanGrad
+
 
     def update_cov_param_diag(self, dim, i, m, S, di_acc,  Di_acc):
         sigma = self.pSigma[dim]
@@ -663,6 +701,7 @@ class SSVI_TF(object):
         S_next = np.maximum(S_next, self.epsilon)
         return S_next, covGrad
 
+
     def update_sigma_param(self, si_acc, scale):
         si_acc *= scale
         w_grad = -1/(2 * np.square(self.w_tau)) + si_acc
@@ -672,6 +711,7 @@ class SSVI_TF(object):
         next_sigma = np.sqrt(-0.5/update)
         return next_sigma, w_grad
 
+
     def compute_stepsize_mean_param(self, dim, i, mGrad):
         acc_grad = self.ada_acc_grad[dim][:, i]
         grad_sqr = np.square(mGrad)
@@ -679,8 +719,10 @@ class SSVI_TF(object):
 
         return np.divide(self.eta, np.sqrt(np.add(acc_grad, grad_sqr)))
 
+
     def compute_stepsize_cov_param(self, dim, i, covGrad):
         return self.cov_eta/(self.time_step[dim] + 1)
+
 
     def compute_step_size_cov_param_diag(self, dim, i, covGrad):
         acc_grad = self.ada_acc_grad_cov[dim][:, i]
@@ -692,10 +734,12 @@ class SSVI_TF(object):
         else:
             return np.divide(self.poisson_eta, np.sqrt(np.add(acc_grad, grad_sqr)))
 
+
     def compute_stepsize_sigma_param(self, w_grad):
         self.w_ada_grad += np.square(w_grad)
         w_step = self.sigma_eta / self.w_ada_grad
         return w_step
+
 
     def keep_track_changes_params(self, dim, i, m, S, m_next, S_next):
         mean_change = np.linalg.norm(m_next - m)
@@ -705,6 +749,7 @@ class SSVI_TF(object):
         else:
             cov_change  = np.linalg.norm(S_next - S)
         self.norm_changes[dim][i, :] = np.array([mean_change, cov_change])
+
 
     def sample_vjs_batch(self, cols_batch, dims_batch, k):
         num_subsamples = np.size(cols_batch, axis=0)
@@ -729,6 +774,7 @@ class SSVI_TF(object):
     """
     Functions to report metrics (error, vlb, etc)
     """
+
     def report_metrics(self, iteration, start, mean_change, cov_change):
         if not self.header_printed and (iteration == self.report or (len(self.to_report) > 0 and iteration == self.to_report[0])):
             self.header_printed = True
@@ -796,6 +842,7 @@ class SSVI_TF(object):
         else:
             print("")
 
+
     def report_metrics_mini(self, iteration, start, mean_change, cov_change):
         if not self.header_printed and (iteration == self.report or (len(self.to_report) > 0 and iteration == self.to_report[0])):
             self.header_printed = True
@@ -814,6 +861,7 @@ class SSVI_TF(object):
 
         print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), np.around(rsme_test,dec), np.around(mean_change, dec), np.around(cov_change, dec)))
 
+
     def estimate_vlb(self, entries, values):
         """
         """
@@ -822,6 +870,7 @@ class SSVI_TF(object):
         for i, entry in enumerate(entries):
             vlb += self.estimate_expectation_term_vlb(entry, values[i])
         return vlb, KL
+
 
     def estimate_expectation_term_vlb(self, entry, val):
         """
@@ -849,6 +898,7 @@ class SSVI_TF(object):
         expected_ll = np.mean(self.likelihood.log_pdf(val, fs, s))
         return expected_ll
 
+
     def estimate_KL_divergence(self):
         """
         Estimate the KL divergence components of the VLB
@@ -866,13 +916,21 @@ class SSVI_TF(object):
                     KL = self.KL_distance_multivariate_normal(m, S, m1, S1)
         return KL
 
+
     def KL_distance_multivariate_normal(self, m0, S0, m1, S1):
+        """
+
+        """
         KL = 0.5 * (np.trace(np.dot(inv(S1),S0)) \
                         + np.dot(np.transpose(m1 - m0), np.dot(inv(S1), m1 - m0))\
                         - self.D + np.log(np.linalg.det(S1)/ np.linalg.det(S0)))
         return KL
 
+
     def estimate_negative_log_likelihood(self, entries, vals):
+        """
+
+        """
         nll = 0.
         dims = np.arange(len(self.dims))
         s    = self.likelihood_param
@@ -898,6 +956,7 @@ class SSVI_TF(object):
 
         return nll
 
+
     def check_stop_cond(self):
         """
         :return: boolean
@@ -917,13 +976,16 @@ class SSVI_TF(object):
 
         return d_mean, d_cov
 
+
     def evaluate_train_error(self):
         rsme, error = self.evaluate_RSME(self.tensor.train_entries, self.tensor.train_vals)
         return rsme, error
 
+
     def evaluate_test_error(self):
         rsme, error = self.evaluate_RSME(self.tensor.test_entries, self.tensor.test_vals)
         return rsme, error
+
 
     def evaluate_error(self, entries, vals):
         """
@@ -943,6 +1005,7 @@ class SSVI_TF(object):
                 return 0
 
         return error/len(entries)
+
 
     def evaluate_RSME(self, entries, vals):
         """
@@ -982,6 +1045,7 @@ class SSVI_TF(object):
         error = error/num_entries
         return rsme, error
 
+
     """
     Predict entry function
     """
@@ -1009,6 +1073,8 @@ class SSVI_TF(object):
                 return 1 if res >= 1/2 else -1
             elif self.likelihood_type == "poisson":
                 return np.rint(res)
+    
+    
     """
     Bridge function
     """
