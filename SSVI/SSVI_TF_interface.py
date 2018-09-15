@@ -182,7 +182,7 @@ class SSVI_TF(object):
         di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
         # NOTE: do multiple di, Di, si computation to verify the variance problem
-        if True:
+        if False:
             k = 16
             di_all     = np.zeros((k+1, self.D))
             di_all[0, :] = di
@@ -239,20 +239,13 @@ class SSVI_TF(object):
         """
         NOTE: robust model will have a separate implementation of this function
         """
-        #return self.estimate_di_Di_si_batch_naive(dim, i, coords, ys, m, S)
-        #return self.estimate_di_Di_si_batch_naive_control_variate(dim, i, coords, ys, m, S)
+        #return self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
+        #return self.estimate_di_Di_si_batch_full_samplings_control_variate(dim, i, coords, ys, m, S)
 
-        return self.estimate_di_Di_si_batch_control_variate(dim, i, coords, ys, m, S)
-        #return self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+        #return self.estimate_di_Di_si_batch_short_control_variate(dim, i, coords, ys, m, S)
+        return self.estimate_di_Di_si_batch_short(dim, i, coords, ys, m, S)
 
-
-    """
-    Note the two different choices of control variate
-    W  = (vj * tk) fijk
-    H  = d/dui log N(ui|mui, Sui)
-    """
-
-    def estimate_di_Di_si_batch_naive(self, dim, i, coords, ys, m, S):
+    def estimate_di_Di_si_batch_full_samplings(self, dim, i, coords, ys, m, S):
         """
         :param dim:
         :param i:
@@ -278,16 +271,18 @@ class SSVI_TF(object):
         assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
         assert(vjs_batch.shape == (num_subsamples, self.k1, self.D))
         mean_batch = np.sum(np.multiply(ui_samples, vjs_batch), axis=2) # (num_samples, k1)
+        #print("naive.mean_batch", np.mean(np.mean(mean_batch, axis=1)), "std", np.mean(np.std(mean_batch, axis=1)))
         if self.noise_added:
             var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
             di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
         else: # Deterministic model
             di, Di, si = self.approximate_di_Di_si_without_second_layer_samplings(vjs_batch, ys, mean_batch)
+        #print("di_full:", np.linalg.norm(di))
         return di,  Di, si
 
 
-    def estimate_di_Di_si_batch_naive_control_variate(self, dim, i, coords, ys, m, S):
+    def estimate_di_Di_si_batch_full_samplings_control_variate(self, dim, i, coords, ys, m, S):
         """
         :param
         :param
@@ -306,8 +301,8 @@ class SSVI_TF(object):
             di += self.estimate_di_control_variate_naive(otherdims, othercols[k,:], ys[k], m, S)
         assert(not np.any(np.isnan(di)))
         #print("di - di_uncontrolled", np.linalg.norm(di - di_uncontrolled))
-        return di_uncontrolled, Di, si
-        #return di, Di, si
+        #return di_uncontrolled, Di, si
+        return di, Di, si
 
     def estimate_di_control_variate_naive(self, otherdims, othercols, y, m, S):
         ndim = np.size(otherdims)
@@ -339,7 +334,6 @@ class SSVI_TF(object):
         assert(di.shape == (self.D,))
         return di
 
-
     def sample_Vk_naive(self, otherms, othercovs, m, S, y):
         ndim = np.size(otherms, axis=0)
         Vks  = np.ones((self.k1, self.D))
@@ -365,7 +359,7 @@ class SSVI_TF(object):
         return res
 
 
-    def estimate_di_Di_si_batch_formulaic(self, dim, i, coords, ys, m, S):
+    def estimate_di_Di_si_batch_short(self, dim, i, coords, ys, m, S):
         """
         :param dim:
         :param i:
@@ -391,25 +385,40 @@ class SSVI_TF(object):
         # Sample vj, tk, ...
         vjs_batch = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
         assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+        assert(vjs_batch.shape == (num_subsamples, self.k1, self.D)) # sanity check
 
         # Sample rayleigh noise
         if self.noise_added:
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
         else:
             ws_batch   = np.zeros((num_subsamples, self.k1))
-        mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
+
+        #mean_batch = np.dot(vjs_batch, m) # Shape will be (num_samples, k1)
+        mean_batch = np.sum(vjs_batch * m[np.newaxis, np.newaxis, :], axis=2)
         var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
+
         for num in range(num_subsamples):
             vs = vjs_batch[num, :, :] # shape (k1, D)
-            if self.diag:
-                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(np.diag(S), vs)), axis=0)
-            else:
-                var_batch[num, :] = np.sum(np.multiply(vs.transpose(), np.inner(S, vs)), axis=0)
+            #if self.diag:
+            #    var_batch[num, :] = np.sum(np.multiply(vs.transpose(),np.inner(np.diag(S), vs)),axis=0)
+            #else:
+            #    var_batch[num, :] = np.sum(np.multiply(vs.transpose(),np.inner(S, vs)), axis=0)
+            for k in range(self.k1):
+                vj = vs[k, :]
+                if self.diag:
+                    var_batch[num, k] = np.dot(vj.transpose(), np.dot(np.diag(S), vj))
+                else:
+                    var_batch[num, k] = np.dot(vj.transpose(), np.dot(S, vj))
+
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
+        di_naive, Di_naive, si_naive = self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
+        #print("di_naive - di" , np.linalg.norm(di_naive - di))
+        #return di_naive, Di, si
+        #print("di", np.linalg.norm(di))
         return di, Di, si
 
 
-    def estimate_di_Di_si_batch_control_variate(self, dim, i, coords, ys, m, S):
+    def estimate_di_Di_si_batch_short_control_variate(self, dim, i, coords, ys, m, S):
         """
         :param dim
         :param
@@ -435,7 +444,7 @@ class SSVI_TF(object):
         alldims            = list(range(self.order))
         otherdims          = alldims[:dim]
         otherdims.extend(alldims[dim + 1 : ])
-        di_uncontrolled, Di, si = self.estimate_di_Di_si_batch_formulaic(dim, i, coords, ys, m, S)
+        di_uncontrolled, Di, si = self.estimate_di_Di_si_batch_short(dim, i, coords, ys, m, S)
         di = np.zeros((self.D,))
         for k in range(num_subsamples):
             di += self.estimate_di_control_variate(otherdims, othercols[k,:], ys[k], m, S)
@@ -576,7 +585,7 @@ class SSVI_TF(object):
         raise NotImplementedError
 
 
-    def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, cov_batch, ws_batch):
+    def approximate_di_Di_si_with_second_layer_samplings(self, vjs_batch, ys, mean_batch, var_batch, ws_batch):
         """
         :param vjs_batch:  (num_sample, k1, D)
         :param ys:         (num_sample,)
@@ -587,10 +596,9 @@ class SSVI_TF(object):
         """
         num_samples = np.size(vjs_batch, axis=0)
         fst_deriv_batch, snd_deriv_batch, si = \
-            self.estimate_expected_derivative_batch(ys, mean_batch, cov_batch, ws_batch)
+                self.estimate_expected_derivative_batch(ys, mean_batch, var_batch, ws_batch)
 
         di = np.zeros((self.D,))
-
         if self.diag:
             Di = np.zeros((self.D,))
         else:
@@ -601,14 +609,12 @@ class SSVI_TF(object):
             vjs_batch_scaled = np.transpose(np.multiply(np.transpose(vjs_batch[num, :, :]), \
                                                         fst_deriv_batch[num, :]))
             di += np.average(vjs_batch_scaled, axis=0)
-
             for k1 in range(self.k1):
                 vj = vjs_batch[num, k1, :]
                 if self.diag:
                     Di += 0.5 * np.multiply(vj, vj) * snd_deriv_batch[num, k1] / self.k1
                 else:
                     Di += 0.5 * np.outer(vj, vj) * snd_deriv_batch[num, k1] / self.k1
-
         return di, Di, si
 
 
