@@ -1,1 +1,17 @@
 _frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "learning_curve.py", line 128, in <module>
+    test_learning_curve(datatype, model, diag, noise, iter_num, noise_ratio, dims)
+  File "learning_curve.py", line 92, in test_learning_curve
+    do_learning_curve(factorizer, tensor, iter_num)
+  File "learning_curve.py", line 61, in do_learning_curve
+    factorizer.factorize(report=500, max_iteration=iter_num, to_report=[0, 10, 25])
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 139, in factorize
+    self.report_metrics(iteration, start, mean_change, cov_change)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 832, in report_metrics
+    test_nll = self.estimate_negative_log_likelihood(self.tensor.test_entries, self.tensor.test_vals)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 959, in estimate_negative_log_likelihood
+    expected_ll = np.mean(self.likelihood.pdf(vals[i], fs, s))
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Probability/poisson.py", line 26, in pdf
+    assert(not np.any(pds.isnull(res)))
+AssertionError
