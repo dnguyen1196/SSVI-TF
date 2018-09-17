@@ -241,7 +241,6 @@ class SSVI_TF(object):
         """
         #return self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
         #return self.estimate_di_Di_si_batch_full_samplings_control_variate(dim, i, coords, ys, m, S)
-
         #return self.estimate_di_Di_si_batch_short_control_variate(dim, i, coords, ys, m, S)
         return self.estimate_di_Di_si_batch_short(dim, i, coords, ys, m, S)
 
@@ -411,7 +410,7 @@ class SSVI_TF(object):
                     var_batch[num, k] = np.dot(vj.transpose(), np.dot(S, vj))
 
         di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
-        di_naive, Di_naive, si_naive = self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
+        #di_naive, Di_naive, si_naive = self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
         #print("di_naive - di" , np.linalg.norm(di_naive - di))
         #return di_naive, Di, si
         #print("di", np.linalg.norm(di))
