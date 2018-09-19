@@ -47,9 +47,9 @@ class SSVI_TF_robust(SSVI_TF):
         else:
             uis_batch = np.random.multivariate_normal(m, S, size=(num_subsamples,self.k1))
 
-        # assert(uis_batch.shape == vjs_batch.shape)           # sanity check
-        # assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
-        # assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+        assert(uis_batch.shape == vjs_batch.shape)           # sanity check
+        assert(num_subsamples == np.size(uis_batch, axis=0)) # sanity check
+        assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
         ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
 
         # mean_batch.shape = (num_samples, k1)

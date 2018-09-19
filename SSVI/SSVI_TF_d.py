@@ -19,34 +19,29 @@ class SSVI_TF_d(SSVI_TF):
         fst_deriv_batch = np.zeros((num_samples,self.k1))
         snd_deriv_batch = np.zeros((num_samples,self.k1))
         s  = self.likelihood_param
-        fs_report_mean = []
-        fs_report_std = []
-
+        #fs_report_mean = []
+        #fs_report_std = []
 
         for num in range(num_samples):
             fs = np.random.normal(mean_batch[num, :], var_batch[num, :], size=(self.k2, self.k1))
-            fs_report_mean.append(np.mean(fs))
-            fs_report_std.append(np.std(fs))
-
+            #fs_report_mean.append(np.mean(fs))
+            #fs_report_std.append(np.std(fs))
             #fst_derivative_log_pdf = np.zeros((self.k2,self.k1))
             #for k in range(self.k2):
             #    fst_derivative_log_pdf = self.likelihood.fst_derivative_log_pdf(ys[num], fs[k, :], s)
-            fst_derivative_log_pdf = self.likelihood.fst_derivative_log_pdf(ys[num], fs, s)
+            #fst_derivative_log_pdf = self.likelihood.fst_derivative_log_pdf(ys[num], fs, s)
             #snd_derivative_log_pdf = np.zeros((self.k2,self.k1))
             #for k in range(self.k2):
             #    snd_derivative_log_pdf[k, :] = self.likelihood.snd_derivative_log_pdf(ys[num], fs[k, :], s)
-
-            #fst_deriv_batch[num] = np.average(fst_derivative_log_pdf, axis=0)
-            fst_deriv_batch[num] = self.likelihood.fst_derivative_log_pdf(ys[num], mean_batch[num, :], s)
-
-            for k in range(self.k1):
-                v = fst_deriv_batch[num,k]
-                if np.abs(v) < 0.1:
-                    #print("small")
-                    fst_deriv_batch[num, k] = np.mean(fst_deriv_batch[num, :])
-
-            snd_derivative_log_pdf = self.likelihood.snd_derivative_log_pdf(ys[num], fs, s)
-            snd_deriv_batch[num] = np.average(snd_derivative_log_pdf, axis=0)
+            fst_deriv_batch[num] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s),axis=0)
+            #fst_deriv_batch[num] = self.likelihood.fst_derivative_log_pdf(ys[num], mean_batch[num, :], s)
+            #for k in range(self.k1):
+            #    v = fst_deriv_batch[num,k]
+            #    if np.abs(v) < 0.1:
+            #        #print("small")
+            #        fst_deriv_batch[num, k] = np.mean(fst_deriv_batch[num, :])
+            #snd_derivative_log_pdf = self.likelihood.snd_derivative_log_pdf(ys[num], fs, s)
+            snd_deriv_batch[num] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
         #print("expected deriv.fs", np.mean(np.asarray(fs_report_mean)), "std:", np.mean(np.asarray(fs_report_std)))
         #print("max-min", np.max(np.mean(fst_deriv_batch, axis=1)), np.min(np.mean(fst_deriv_batch, axis=1))) 
         return fst_deriv_batch, snd_deriv_batch, None

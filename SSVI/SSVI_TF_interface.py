@@ -176,24 +176,7 @@ class SSVI_TF(object):
         coords = np.array([entry[0] for entry in observed_subset])
         ys = np.array([entry[1] for entry in observed_subset])
 
-        #if self.likelihood_type == "normal":
-        #    di, Di, si = self.estimate_di_Di_si_complete_conditional_batch(dim, i, coords, ys, m, S)
-        #else:
         di, Di, si = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
-
-        # NOTE: do multiple di, Di, si computation to verify the variance problem
-        if False:
-            k = 16
-            di_all     = np.zeros((k+1, self.D))
-            di_all[0, :] = di
-            for j in range(k):
-                d, D, s = self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
-                di_all[j+1, :] = d   
-            di_var = np.var(di_all, axis=0)
-            di_mean = np.mean(di_all, axis=0)
-            print("variance: ", np.linalg.norm(di_var), "mean:", np.linalg.norm(di_mean)) 
-            di = di_mean
-
         scale = len(observed) / len(observed_subset)
         Di *= scale
         di *= scale
@@ -202,7 +185,6 @@ class SSVI_TF(object):
         assert(not np.any(np.iscomplex(Di)))
         assert(not np.any(np.isnan(Di)))
         assert(not np.any(np.isinf(Di)))
-
         # Compute next covariance and mean
         if self.diag:
             S_next, S_grad   = self.update_cov_param_diag(dim, i, m, S, di, Di)
@@ -239,10 +221,10 @@ class SSVI_TF(object):
         """
         NOTE: robust model will have a separate implementation of this function
         """
-        #return self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
+        return self.estimate_di_Di_si_batch_full_samplings(dim, i, coords, ys, m, S)
         #return self.estimate_di_Di_si_batch_full_samplings_control_variate(dim, i, coords, ys, m, S)
         #return self.estimate_di_Di_si_batch_short_control_variate(dim, i, coords, ys, m, S)
-        return self.estimate_di_Di_si_batch_short(dim, i, coords, ys, m, S)
+        #return self.estimate_di_Di_si_batch_short(dim, i, coords, ys, m, S)
 
     def estimate_di_Di_si_batch_full_samplings(self, dim, i, coords, ys, m, S):
         """
@@ -255,7 +237,7 @@ class SSVI_TF(object):
         :return:
         Note that robust model will have a completely different implementation of this
         function
-        """       
+        """ 
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
         othercols_left     = coords[:, : dim]
         othercols_right    = coords[:, dim + 1 :]
@@ -266,18 +248,19 @@ class SSVI_TF(object):
         # Shape of vjs_batch would be (num_subsamples, k1, D)
         # Sample vj, tk, ...
         vjs_batch  = self.sample_vjs_batch(othercols_concat, otherdims, self.k1)
-        ui_samples = np.random.multivariate_normal(m, S, size=(num_subsamples, self.k1))
-        assert(num_subsamples == np.size(vjs_batch, axis=0)) # sanity check
+        if self.diag:
+            ui_samples = np.random.multivariate_normal(m, np.diag(S), size=(num_subsamples, self.k1))
+        else:
+            ui_samples = np.random.multivariate_normal(m, S, size=(num_subsamples, self.k1))
+        assert(num_subsamples == np.size(vjs_batch, axis=0))
         assert(vjs_batch.shape == (num_subsamples, self.k1, self.D))
         mean_batch = np.sum(np.multiply(ui_samples, vjs_batch), axis=2) # (num_samples, k1)
-        #print("naive.mean_batch", np.mean(np.mean(mean_batch, axis=1)), "std", np.mean(np.std(mean_batch, axis=1)))
-        if self.noise_added:
+        if self.noise_added: # Simple model
             var_batch  = np.zeros((num_subsamples, self.k1)) # Shape will be (num_samples, k1)
             ws_batch   = np.random.rayleigh(np.square(self.w_sigma), size=(num_subsamples, self.k1))
             di, Di, si = self.approximate_di_Di_si_with_second_layer_samplings(vjs_batch, ys, mean_batch, var_batch, ws_batch)
         else: # Deterministic model
             di, Di, si = self.approximate_di_Di_si_without_second_layer_samplings(vjs_batch, ys, mean_batch)
-        #print("di_full:", np.linalg.norm(di))
         return di,  Di, si
 
 

@@ -68,7 +68,8 @@ class PoissonDistribution(object):
         return res
 
     def fst_derivative_log_pdf(self, y, f, s=None):
-        sigma = sigmoid(f, 1e-10)
+        #sigma = sigmoid(f, 1e-10)
+        sigma = sigmoid(f)
         A = poisson_link(f)
         res = sigma * (np.divide(y, A) - 1.0)
         res = np.nan_to_num(res)

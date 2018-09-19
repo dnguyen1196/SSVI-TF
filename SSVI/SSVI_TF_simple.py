@@ -20,7 +20,7 @@ class SSVI_TF_simple(SSVI_TF):
     def estimate_di_Di_si_complete_conditional_batch(self, dim, i, coords, ys, m, S):
         return self.estimate_di_Di_si_batch(dim, i, coords, ys, m, S)
 
-    def estimate_expected_derivative_batch(self, ys, mean_batch, cov_batch, ws_batch):
+    def estimate_expected_derivative_batch(self, ys, mean_batch, var_batch, ws_batch):
         num_samples     = np.size(mean_batch, axis=0)
 
         assert(self.k1 == np.size(mean_batch, axis=1))
@@ -32,18 +32,13 @@ class SSVI_TF_simple(SSVI_TF):
         s  = self.likelihood_param
 
         for num in range(num_samples):
-            fs = np.random.normal(mean_batch[num, :], cov_batch[num, :] + ws_batch[num, :], size=(self.k2, self.k1))
-
+            fs = np.random.normal(mean_batch[num, :], var_batch[num, :] + ws_batch[num, :], size=(self.k2, self.k1))
             fst_deriv_batch[num, :] = np.average(self.likelihood.fst_derivative_log_pdf(ys[num], fs, s), axis=0)
-            # print("fst " , fst_deriv_batch.shape)
-
             snd_deriv_batch[num, :] = np.average(self.likelihood.snd_derivative_log_pdf(ys[num], fs, s), axis=0)
             si_batch[num, :] = np.multiply(snd_deriv_batch[num, :], ws_batch[num, :]) / (8 * np.square(self.w_sigma))
-
         si = si_batch.mean()
         return fst_deriv_batch, snd_deriv_batch, si
 
-    # TODO: implement batch version by doing something similar to this
     def compute_di_Di_si_complete_conditional(self, dim, i, coord, y, mui, Sui):
         othercols    = coord[: dim]
         othercols.extend(coord[dim + 1 :])
