@@ -1,6 +1,8 @@
 from abc import abstractclassmethod, abstractmethod
 import Probability.ProbFun as probs
 import numpy as np
+import os
+import pickle
 
 from numpy.linalg import inv
 from numpy.linalg import norm
@@ -94,7 +96,7 @@ class SSVI_TF(object):
         self.d_mean = 1.
         self.d_cov  = 1.
 
-    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False, to_report=[], detailed_report=True):
+    def factorize(self, report=100, max_iteration=2000, fixed_covariance=False, to_report=[], detailed_report=True, output_folder="output"):
         self.report = report
         self.header_printed = False
         self.to_report = to_report
@@ -103,6 +105,7 @@ class SSVI_TF(object):
         self.detailed_report = detailed_report
         self.missing = {}
         self.max_changes = [[0, 0] for _ in self.dims]
+        self.output_folder = output_folder
 
         print("Factorizing with max_iteration =", max_iteration, " fixing covariance?: ", fixed_covariance)
 
@@ -116,7 +119,6 @@ class SSVI_TF(object):
                 col = update_column_pointer[dim]
                 # Update the natural params of the col-th factor
                 # in the dim-th dimension
-                # self.update_natural_params(dim, col, iteration)
                 self.update_natural_param_batch(dim, col)
                 self.update_hyper_parameter(dim)
 
@@ -124,16 +126,11 @@ class SSVI_TF(object):
             for dim in range(self.order):
                 if (update_column_pointer[dim] + 1 == self.dims[dim]):
                     self.time_step[dim] += 1  # increase time step
-                    #self.max_changes[dim] = [0,0] # Reset max_changes
 
                 update_column_pointer[dim] = (update_column_pointer[dim] + 1) \
                                              % self.dims[dim]
 
             mean_change, cov_change = self.check_stop_cond()
-            #mean_change = max(x[0] for x in self.max_changes)
-            #cov_change  = max(x[1] for x  in self.max_changes)
-            #print(mean_change, cov_change)
-
             if (iteration != 0 and (iteration % self.report == 0)) or iteration in to_report:
                 if self.detailed_report:
                     self.report_metrics(iteration, start, mean_change, cov_change)
@@ -831,7 +828,7 @@ class SSVI_TF(object):
             print("")
 
 
-    def report_metrics_mini(self, iteration, start, mean_change, cov_change):
+    def report_metrics_mini(self, iteration, start, mean_change, cov_change, output_folder):
         if not self.header_printed and (iteration == self.report or (len(self.to_report) > 0 and iteration == self.to_report[0])):
             self.header_printed = True
             print("Tensor dimension:", self.dims)
@@ -840,14 +837,27 @@ class SSVI_TF(object):
             print("Using diagonal covariance:", self.diag)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
-            print("iteration |   time   |test_rsme|  d_mean  |   d_cov  |")
+            print("iteration |   time   |  d_mean  |   d_cov  |")
+            
+            tensor_savefile = os.path.join(output_folder, "tensor.pickle")
+            with open(tensor_savefile, "wb") as handle:
+                pickle.dump(self.tensor, handle)
 
         current = time.time()
         dec = 4
-        
-        rsme_test, error_test   = self.evaluate_test_error()
+        print("{:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), np.around(mean_change, dec), np.around(cov_change, dec)))
+        if self.noise_added:
+            noise_file = str(iteration) + "_w.txt" 
+            noise_file = os.path.join(output_folder, noise_file)
+            np.save(noise_file,self.w_sigma)
 
-        print("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), np.around(rsme_test,dec), np.around(mean_change, dec), np.around(cov_change, dec)))
+        for dim, ncol in enumerate(self.dims):
+            mean_file = str(dim) + "mean_" + str(iteration) + "_" + ".txt"
+            cov_file  = str(dim) + "cov_" + str(iteration) + "_"  + ".txt"
+            mean_file = os.path.join(output_folder, mean_file)
+            cov_file = os.path.join(output_folder, cov_file)
+            self.posterior.save_mean_params(dim,mean_file)
+            self.posterior.save_cov_parameters(dim,cov_file)
 
 
     def estimate_vlb(self, entries, values):

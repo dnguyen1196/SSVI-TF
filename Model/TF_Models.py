@@ -38,6 +38,12 @@ class Posterior(object):
         for i, s in enumerate(self.dims):
             self.params[i] = self.initialize_params(s, self.initMean, self.initCov)
 
+    def save_mean_parameters(self, dim,  mean_file):
+        np.save(mean_file, self.params[dim][:, 0, :], delimiter=",")
+
+    def save_cov_parameters(self, dim, cov_file):
+        np.save(cov_file, self.params[dim][:, 1:, :], delimiter=",")
+
 
 class Posterior_Full_Covariance(Posterior):
     def __init__(self, dims, D, initMean=None, initCov=None, randstart=True):
