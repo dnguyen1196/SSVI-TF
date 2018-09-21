@@ -1,7 +1,7 @@
-/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/sept_17/tensor/binary/50_50_50_0.05/
-binary deterministic 0.1
-binary simple 0.1
-binary robust 0.1
+/cluster/home/mnguye16/SSVI/SSVI-TF/learning_results/sept_19/diag/50_50_50_0.05/binary/
+binary deterministic 0
+binary simple 0
+binary robust 0
 binary deterministic 1.0
 binary simple 1.0
 binary robust 1.0
