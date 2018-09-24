@@ -429,7 +429,6 @@ class Tensor(object):
         print("Evaluation for true params: ")
         print(" test_rsme | train_rsme | rel-te-err | rel-tr-err | train_nll | test_nll  |")
 
-
     def evaluate_error(self, entries, vals):
         rsme = 0.0
         error = 0.0
@@ -449,3 +448,13 @@ class Tensor(object):
         rsme = np.sqrt(rsme/len(vals))
         error = error/len(vals)
         return rsme, error
+
+    def save_tensor_data(self, data_folder):
+        save_file = os.path.join(data_folder, "tensor.pickled")
+        
+
+
+        
+
+
+
