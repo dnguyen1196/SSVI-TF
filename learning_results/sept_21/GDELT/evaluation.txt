@@ -1,0 +1,20 @@
+Loading tensor from learning_results/sept_21/GDELT/tensor.pickle
+ iteration | test_rsme |
+   2500    6.098877649864841
+ iteration | test_rsme |
+   5000    5.327916817706308
+ iteration | test_rsme |
+   7500    5.005502850653337
+ iteration | test_rsme |
+  10000    4.63314498187686
+Loading tensor from learning_results/sept_21/GDELT/tensor.pickle
+ iteration | test_rsme |
+  12500    4.512410461533304
+ iteration | test_rsme |
+  15000    6.493278043995261
+ iteration | test_rsme |
+  17500    6.211127756460823
+ iteration | test_rsme |
+  20000    5.873962978685396
+ iteration | test_rsme |
+  22500    5.693519343581676
