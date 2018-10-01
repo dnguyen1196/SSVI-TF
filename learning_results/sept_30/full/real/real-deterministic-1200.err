@@ -1,0 +1,15 @@
+_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
+Traceback (most recent call last):
+  File "mini_test.py", line 143, in <module>
+    factorizer = SSVI_TF_d(**params)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_d.py", line 13, in __init__
+    mean0, cov0, sigma0, unstable_cov, k1, k2, batch_size, eta, cov_eta, sigma_eta, randstart)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/SSVI/SSVI_TF_interface.py", line 37, in __init__
+    self.posterior        = Posterior_Full_Covariance(self.dims, self.D, mean0, cov0, randstart)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Model/TF_Models.py", line 51, in __init__
+    super(Posterior_Full_Covariance, self).__init__(dims, D, initMean, initCov)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Model/TF_Models.py", line 19, in __init__
+    self.params[i] = self.initialize_params(s, self.initMean, self.initCov)
+  File "/cluster/home/mnguye16/SSVI/SSVI-TF/Model/TF_Models.py", line 60, in initialize_params
+    matrices[i, 0, :]   = np.random.multivariate_normal(mean, cov)
+ValueError: could not broadcast input array from shape (10) into shape (20)
