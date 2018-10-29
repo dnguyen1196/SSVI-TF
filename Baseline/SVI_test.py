@@ -1,9 +1,10 @@
-from Baseline.CP_ALS import CPDecompPytorch3D
+from Baseline.SVI import EM_online
 from Tensor.real_tensor import RV_tensor
 from Tensor.binary_tensor import binary_tensor
 from Tensor.count_tensor import count_tensor
 import numpy as np
 
+np.random.seed(seed=42)
 
 def synthesize_tensor(dims, datatype, using_ratio, noise):
     real_dim = 100
@@ -24,7 +25,8 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
     return tensor
 
 
-test_tensor = synthesize_tensor([10,10,10], "count", False, 0)
-
-factorizer = CPDecompPytorch3D(test_tensor, rank=5)
-factorizer.factorize(10000)
+test_tensor = synthesize_tensor([10,10,10], "binary", False, 0)
+step = lambda x : 0.01
+max_iterations = 1000
+factorizer = EM_online(test_tensor, rank=5)
+factorizer.optimize(max_iterations, step)

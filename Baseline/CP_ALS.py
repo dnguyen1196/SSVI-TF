@@ -4,37 +4,57 @@ from torch.autograd import Variable
 import numpy as np
 
 
-class CPDecompPytorch3D(torch.nn.Module):
-    def __init__(self, tensor, lambd=1, rank=10):
-        """
+class ListModule(torch.nn.Module):
+    def __init__(self, *args):
+        super(ListModule, self).__init__()
+        idx = 0
+        for module in args:
+            self.add_module(str(idx), module)
+            idx += 1
 
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= len(self._modules):
+            raise IndexError('index {} is out of range'.format(idx))
+        it = iter(self._modules.values())
+        for i in range(idx):
+            next(it)
+        return next(it)
+
+    def __iter__(self):
+        return iter(self._modules.values())
+
+    def __len__(self):
+        return len(self._modules)
+
+
+class CPDecompPytorch3D(torch.nn.Module):
+    def __init__(self, tensor, rank=10, lambd=0.01):
+        """
         :param tensor:
         :param init:
         :param lambd:
         :param rank:
 
-        Example:
-        >>> optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-        >>> optimizer.zero_grad()
-        >>> loss_fn(model(input), target).backward()
-        >>> optimizer.step()
         """
         super().__init__()
 
         self.tensor = tensor
         self.dims   = tensor.dims
         self.rank = rank
+        self.lambd = lambd
+        self.datatype = tensor.datatype
 
-        self.d0_factors = torch.nn.Embedding(self.dims[0], rank, sparse=True)
-        self.d1_factors = torch.nn.Embedding(self.dims[1], rank, sparse=True)
-        self.d2_factors = torch.nn.Embedding(self.dims[2], rank, sparse=True)
+        factors = []
+        for dim, ncol in enumerate(self.dims):
+            factors.append(torch.nn.Embedding(ncol, rank))
 
-        self.factors = [self.d0_factors, self.d1_factors, self.d2_factors]
+        self.factors = ListModule(*factors)
         self.batch_size = 128
         self.round_robins_indices = [0 for _ in self.dims]
 
     def factorize(self, num_iters):
-        optimizer = optim.SGD(self.parameters(), lr=0.00000001)
+        optimizer = optim.Adagrad(self.parameters(), lr=1)
+
         with torch.enable_grad():
             for iteration in range(num_iters):
                 for dim, col in enumerate(self.round_robins_indices):
@@ -49,7 +69,6 @@ class CPDecompPytorch3D(torch.nn.Module):
                         observed_subset = observed
 
                     loss = self.loss_fun(observed_subset)
-                    # print(loss)
                     loss.backward()
                     optimizer.step()
 
@@ -57,29 +76,28 @@ class CPDecompPytorch3D(torch.nn.Module):
                     self.evaluate(iteration)
 
                 for dim, col in enumerate(self.round_robins_indices):
-                    self.round_robins_indices[dim] += 1
-                    self.round_robins_indices[dim] %= self.dims[dim]
-
+                    self.round_robins_indices[dim] = \
+                        (1 + self.round_robins_indices[dim]) % self.dims[dim]
 
     def loss_fun(self, observed):
         """
-
         :param observed:
         :return:
-
-        TODO: other types of tensor entries
         """
-        # with torch.enable_grad():
         loss = 0.
-        for entry, y in observed:
-            inner = torch.ones(self.rank)
-            for dim, col in enumerate(entry):
-                col = Variable(torch.LongTensor([np.long(col)]))
-                vector = self.factors[dim](col)[0]
+        entries = [pair[0] for pair in observed]
+        y = Variable(torch.FloatTensor([pair[1] for pair in observed]))
 
-                inner *= vector
-            # print(loss)
-            loss += (torch.sum(inner) - y)**2
+        inners = torch.ones(len(observed), self.rank)
+
+        for dim, _ in enumerate(self.dims):
+            all_cols = [x[dim] for x in entries]
+            all_cols = Variable(torch.LongTensor(all_cols))
+            vectors = self.factors[dim](all_cols) # A list of vector
+            inners *= vectors
+            loss += self.lambd * torch.sum(vectors**2) # Regularization term
+
+        loss += torch.sum((torch.sum(inners, dim=1) - y)**2)
 
         return loss
 
@@ -89,19 +107,30 @@ class CPDecompPytorch3D(torch.nn.Module):
 
         train_rsme, _ = self.evaluate_train_error()
         test_rsme, _ = self.evaluate_test_error()
-        # print ("{:^10} {:^10}".format(np.around(test_rsme, 4), np.around(train_rsme, 4)))
         print ("{:^10} {:^10} {:^10}".format(iteration, test_rsme, train_rsme))
 
-
     def evaluate_train_error(self):
-        rsme, error = self.evaluate_RSME(self.tensor.train_entries, self.tensor.train_vals)
+        rsme, error = self.evaluate_rsme(self.tensor.train_entries, self.tensor.train_vals)
         return rsme, error
 
     def evaluate_test_error(self):
-        rsme, error = self.evaluate_RSME(self.tensor.test_entries, self.tensor.test_vals)
+        rsme, error = self.evaluate_rsme(self.tensor.test_entries, self.tensor.test_vals)
         return rsme, error
 
-    def evaluate_RSME(self, entries, vals):
+    def predict_entry(self, entry):
+        inner = torch.ones(self.rank)
+        for dim, col in enumerate(entry):
+            col = Variable(torch.LongTensor([np.long(col)]))
+            inner *= self.factors[dim](col)[0]
+
+        if self.datatype == "real":
+            return float(torch.sum(inner))
+        elif self.datatype == "binary":
+            return 1 if torch.sum(inner) > 0 else -1
+        elif self.datatype == "count":
+            return float(torch.sum(inner))
+
+    def evaluate_rsme(self, entries, vals):
         """
         :param entries:
         :param vals:
@@ -113,25 +142,10 @@ class CPDecompPytorch3D(torch.nn.Module):
 
         for i in range(len(entries)):
             entry = entries[i]
-
             predict = self.predict_entry(entry)
             correct = vals[i]
             rsme += (predict - correct)**2
 
-            # if self.likelihood_type == "normal":
-            #     error += np.abs(predict - correct)/abs(correct)
-            # elif self.likelihood_type == "bernoulli":
-            #     error += 1 if predict != correct else 0
-            # elif self.likelihood_type == "poisson":
-            #     error += np.abs(predict - correct)
-
-        rsme = torch.sqrt(rsme/num_entries)
+        rsme = np.sqrt(rsme/num_entries)
         error = error/num_entries
         return rsme, error
-
-    def predict_entry(self, entry):
-        inner = torch.ones(self.rank)
-        for dim, col in enumerate(entry):
-            col = Variable(torch.LongTensor([np.long(col)]))
-            inner *= self.factors[dim](col)[0]
-        return torch.sum(inner)

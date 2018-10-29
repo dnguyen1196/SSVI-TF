@@ -1,5 +1,7 @@
 import sys
-import pickle
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import argparse
 
 from Tensor.real_tensor import RV_tensor
