@@ -75,6 +75,7 @@ from torch.autograd import Variable
 from torch.nn import ModuleList, ParameterList, Parameter
 import math
 
+
 class EM_online(nn.Module):
     def __init__(self, tensor, rank):
         super(EM_online, self).__init__()
@@ -84,7 +85,7 @@ class EM_online(nn.Module):
         self.datatype = tensor.datatype
         self.tensor = tensor
         if self.datatype == "count":
-            self.overdispersion_param = 1.
+            self.overdispersion_param = 1
             self.max_count = tensor.max_count
             self.min_count = tensor.min_count
 
@@ -101,57 +102,61 @@ class EM_online(nn.Module):
             if val == -1:
                 self.test_vals[i] = 0
 
-
         self.N = len(self.train_vals)
         self.batch_size    = 128
         self.R = rank
+        self.U = [] # Hidden vector, following the authors' notations
+        for dim, nrow in enumerate(self.dims):
+            self.U.append(torch.rand(nrow, rank))
 
-        self.vector_factors = []
-        for dim, ncol in enumerate(self.dims):
-            self.vector_factors.append(torch.ones(ncol, rank))
-
-        self.S_diagonals = []
-        # Each S^(r, k) is a diagonal matrix -> storing the diagonal only -> (ncol,) vector
+        self.S = [] # Storing the diagonal of matrix S, according to the authors' notations
+        # Each S^(r, k) is a diagonal matrix -> storing the diagonal only -> (nrow,) vector
         # But we have to store the similar vector (R times) for each dimension
         # Refer to the paper to assert S.shape
-        # Each S^(r,k) is (ncol, ncol) matrix. Note that ncol is the number of columns of the specified dimensio
-        for dim, ncol in enumerate(self.dims):
-            self.S_diagonals.append(torch.zeros(ncol, rank))
+        # Each S^(r,k) is (nrow, nrow) matrix. Note that nrow is the number of columns of the specified dimension
+        for dim, nrow in enumerate(self.dims):
+            self.S.append(torch.zeros(nrow, rank))
 
-        self.t_vectors = []
-        # Similarly, the t_vectors have (R, ncol) for each dimension
-        for dim, ncol in enumerate(self.dims):
-            self.t_vectors.append(torch.zeros(ncol, rank))
+        self.T = [] # Storing the t_vectors, following the authors' notation
+        # Similarly, the t_vectors have (R, nrow) for each dimension
+        for dim, nrow in enumerate(self.dims):
+            self.T.append(torch.zeros(nrow, rank))
 
-        # Latent vectors
+        # Latent lambda vector
         self.L = torch.ones(rank)
 
-    def optimize(self, max_iterations=1000, step=lambda _ : 0.01):
+
+    def optimize(self, max_iterations=1000, step=lambda x : 0.01):
         """
 
         -------
         :return:
         """
-        start          = 0
+        start = 0
         for iteration in range(max_iterations):
+            if iteration in [1, 5, 10, 50] or iteration % 1000 == 0:
+                self.report(iteration)
+
             end = (start + self.batch_size) % self.N
             if end < start:
                 sample_idx = list(range(end)) + list(range(start, self.N))
             else:
                 sample_idx = list(range(start, end))
+            start = end
 
             batch_entries = np.take(self.train_entries, sample_idx, axis=0)
             batch_vals    = np.take(self.train_vals, sample_idx)
 
             # First do the expectation step
-            wi_expected, c_vectors, d_vectors   = self.expectation_step(batch_entries, batch_vals)
+            # This will compute the required quantities to compute the sufficient statistics
+            wi_expected, c_vectors, d_vectors = self.expectation_step(batch_entries, batch_vals)
 
             stepsize = step(iteration)
             # Then do the maximization step
+            # In the maximization step, the algorithm first compute the sufficient statistics and then
+            # update the hidden vectors
             self.maximization_step(wi_expected, batch_entries, batch_vals, c_vectors, d_vectors, stepsize)
 
-            if iteration in [0, 5, 10, 50] or iteration % 100 == 0:
-                self.report(iteration)
 
     def expectation_step(self, batch_entries, batch_vals):
         """
@@ -164,9 +169,8 @@ class EM_online(nn.Module):
 
         So first need to compute the Pi
         Each pi is simply sum(L * [vector])
-
         """
-        phi_batch, c_vectors, d_vectors = self.phi_batch_compute(batch_entries) # shape = (num_samples)
+        phi_batch, c_vectors, d_vectors = self.phi_c_d_batch_compute(batch_entries) # shape = (num_samples)
         wi_expected = None
         if self.datatype == "binary":
             wi_expected = 0.5/ phi_batch * torch.tanh(phi_batch/2)
@@ -174,6 +178,7 @@ class EM_online(nn.Module):
             yi = torch.FloatTensor(batch_vals)
             wi_expected = 0.5 * (yi + self.overdispersion_param)/ phi_batch * torch.tanh(phi_batch/2)
         return wi_expected, c_vectors, d_vectors
+
 
     def maximization_step(self, wi_expected, batch_entries, batch_vals, c_vectors, d_vectors, stepsize):
         """
@@ -197,9 +202,64 @@ class EM_online(nn.Module):
         ki_batch = self.ki_batch_compute(batch_vals)
 
         # Do stochastic update on the sufficient statistics S and t
-        self.S_update_stochastic(c_vectors, wi_expected, batch_entries, stepsize)
-        self.t_stochastic_update(c_vectors, d_vectors, wi_expected, ki_batch, batch_entries, stepsize)
+        # self.S_update_stochastic(c_vectors, wi_expected, batch_entries, stepsize)
+        # self.t_stochastic_update(c_vectors, d_vectors, wi_expected, ki_batch, batch_entries, stepsize)
+
+        # Update both S and t sufficient statistics
+        self.S_t_update_stochastic(c_vectors, d_vectors, wi_expected, ki_batch, batch_entries, stepsize)
+
         self.ui_vectors_update(batch_entries)
+
+
+    def S_t_update_stochastic(self, c_vectors, d_vectors, wi_expected, ki_batch, batch_entries, stepsize):
+        """
+
+        :param c_vectors:
+                shape = (num_samples, ndim, R)
+
+        :param d_vectors:
+                shape = (num_samples, ndim, R)
+
+        :param wi_expected:
+        :param ki_batch:
+        :param batch_entries:
+        :param stepsize:
+        :return:
+        """
+
+        num_samples = len(batch_entries)
+        s_sum_update = {}
+        t_sum_update = {}
+
+        # Compute all the s_update term
+        # Note that the update term for a (dim k, row n) factor is the sum over all the
+        # tensor entry values that are associated with that factor
+        # That's why we need to compute all the update first and store it in a dictionary
+
+        for num, entry in enumerate(batch_entries):
+            for dim, row in enumerate(entry):
+                # NOTE that s_update is a R-vector
+                s_update = c_vectors[num, dim, :] ** 2 * wi_expected[num]
+                # Like wise t_update.shape = (R,)
+                t_update = (ki_batch[num] - d_vectors[num, dim, :] * wi_expected[num]) * c_vectors[num, dim, :]
+
+                if (dim, row) not in s_sum_update:
+                    s_sum_update[(dim, row)] = torch.zeros(self.R)
+                    t_sum_update[(dim, row)] = torch.zeros(self.R)
+
+                t_sum_update[(dim, row)] += t_update
+                s_sum_update[(dim, row)] += s_update
+
+        for dim, row in s_sum_update.keys():
+            # print(s_update)
+            s_update = s_sum_update[(dim, row)]
+            s_cur    = self.S[dim][row, :]
+            # print(s_cur)
+            self.S[dim][row, :] = (1 - stepsize) * s_cur + stepsize * s_update
+
+            t_update = t_sum_update[(dim, row)]
+            t_cur    = self.T[dim][row, :]
+            self.T[dim][row, :] = (1 - stepsize) * t_cur + stepsize * t_update
 
 
     def S_update_stochastic(self, c_vectors, wi_expected, batch_entries, stepsize):
@@ -217,28 +277,45 @@ class EM_online(nn.Module):
         :return:
 
         S is a diagonal matrix and thus we only work with the diagonal part
-        S_nn^(r, k) = (1-stepsize) * S_nn ^(r, k) + stepsize * sum(c_ik^2 wi)
+        S_nn^(r, k) = (1-stepsize) * S_nn ^(r, k) + stepsize * sum(c_ik,r^2 wi)
+
+        # for all entries i that uses row n of dimension k
 
         For each entry in batch_entries
-        -> for a particular column n with dimension k
+        -> for a particular row n with dimension k
 
-        >>> S[dim k][column n] = (1-stepsize) * S[dim k][col n] + stepsize * c_n[entry_num, k]**2 * wi_expected[entry_num]
+        >>> S[dim k][rank r][row n] = (1-stepsize) * S[dim k][rank r][row n] \
+                                + stepsize * SUM [ c_n[entry_num, k]**2 * wi_expected[entry_num] ]
 
         """
         num_samples = len(batch_entries)
+        s_diagonal_update = {}
+
+        # Compute all the s_update term
+        # Note that the update term for a (dim k, row n) factor is the sum over all the
+        # tensor entry values that are associated with that factor
+        # That's why we need to compute all the update first and store it in a dictionary
         for num, entry in enumerate(batch_entries):
-            for dim, col in enumerate(entry):
+            for dim, row in enumerate(entry):
                 s_update = c_vectors[num, dim, :] ** 2 * wi_expected[num]
-                # print(s_update)
-                s_cur    = self.S_diagonals[dim][col, :]
-                # print(s_cur)
-                self.S_diagonals[dim][col, :] = (1-stepsize) * s_cur + stepsize * s_update
+                if (dim, row) not in s_diagonal_update:
+                    s_diagonal_update[(dim, row)] = torch.zeros(self.R)
+                s_diagonal_update[(dim, row)] += s_update
+
+        for dim, row in s_diagonal_update.keys():
+            s_update = s_diagonal_update[(dim, row)]
+            s_cur    = self.S[dim][row, :]
+            self.S[dim][row, :] = (1 - stepsize) * s_cur + stepsize * s_update
 
     def t_stochastic_update(self, c_vectors, d_vectors, wi_expected, ki_batch, batch_entries, stepsize):
         """
 
         :param c_vectors:
+                shape = (num_samples, ndim, R)
+
         :param d_vectors:
+                shape = (num_samples, ndim, R)
+
         :param wi_expected:
         :param ki_batch:
         :param batch_entries:
@@ -246,14 +323,25 @@ class EM_online(nn.Module):
 
         :return:
         # Assert with original paper
-        >>> t[dim k][column n] += stepsize * (K[entry_num] - d_vectors[entry_num, dim, :] * wi_expected[entry_num]) * c_n[entry_num, k]
+        >>> t[dim k][column n] += stepsize * (K[entry_num] - d_vectors[entry_num, dim, :] * wi_expected[entry_num]) \
+                                            * c_n[entry_num, k]
+
         """
+        # Refer to S_stochastic_update as above -> we also need to compute all the t_update separately
+        # And then apply the updates
         num_samples = len(batch_entries)
+        t_diagonal_update = {}
+
         for num, entry in enumerate(batch_entries):
             for dim, col in enumerate(entry):
                 t_update = (ki_batch[num] - d_vectors[num, dim, :] * wi_expected[num]) * c_vectors[num, dim, :]
-                t_cur    = self.t_vectors[dim][col, :]
-                self.t_vectors[dim][col, :] = (1-stepsize) * t_cur + stepsize * t_update
+                if (dim, col) not in t_diagonal_update:
+                    t_diagonal_update[(dim, col)] = torch.zeros(rank)
+
+        for dim, col in t_diagonal_update.keys():
+            t_update = t_diagonal_update[(dim, col)]
+            t_cur    = self.T[dim][col, :]
+            self.T[dim][col, :] = (1 - stepsize) * t_cur + stepsize * t_update
 
     def ki_batch_compute(self, batch_vals):
         """
@@ -270,6 +358,7 @@ class EM_online(nn.Module):
         else:
             ki_batch = yi/2 - self.overdispersion_param/2
         return ki_batch
+
 
     def phi_batch_compute(self, batch_entries):
         """
@@ -289,7 +378,7 @@ class EM_online(nn.Module):
         for dim, _ in enumerate(self.dims):
             all_cols = [x[dim] for x in batch_entries]
             # all_cols = Variable(torch.LongTensor(all_cols))
-            vectors  = self.vector_factors[dim][all_cols] # -> shape = (num_samples, R)
+            vectors  = self.U[dim][all_cols] # -> shape = (num_samples, R)
             # Get the list of vector associated with the column in the
             # specified dimension
             inners *= vectors
@@ -298,6 +387,7 @@ class EM_online(nn.Module):
         c_vectors, d_vectors = self.c_and_d_vectors_compute(batch_entries)
 
         return phi_batch, c_vectors, d_vectors
+
 
     def c_and_d_vectors_compute(self, batch_entries):
         """
@@ -326,7 +416,7 @@ class EM_online(nn.Module):
             all_cols = [x[dim] for x in batch_entries]
             # all_cols = Variable(torch.LongTensor(all_cols))
 
-            vectors  = self.vector_factors[dim][all_cols] # -> shape = (num_samples, R)
+            vectors  = self.U[dim][all_cols] # -> shape = (num_samples, R)
             involved_vectors[dim, :, :] = vectors
         #
         for num, entry in enumerate(batch_entries):
@@ -340,6 +430,51 @@ class EM_online(nn.Module):
                 d_vector[num, dim, :] = torch.sum(all_products) - all_products
 
         return c_vector, d_vector
+
+
+    def phi_c_d_batch_compute(self, batch_entries):
+        """
+        :param batch_entries:
+        :return: (phi_batch, c_vectors, d_vectors)
+
+        For each observed entry
+        For each dimension k
+        For each involved column col
+        >>> c_vectors[dim k][col] = self.L * prod[vectors from OTHER dims] # Size R vector
+        >>> d_vectors[dim k][col] = sum(self.L * prod[all vectors from ALL dims]) # A scalar
+        >>>                       - self.L[r] * (prod[all vectors from all dims]) # A vector
+
+        """
+        num_samples = len(batch_entries)
+        c_vectors = torch.zeros(num_samples, self.ndim, self.R)
+        d_vectors = torch.zeros(num_samples, self.ndim, self.R)
+        involved_vectors = torch.zeros(self.ndim, num_samples, self.R)
+        inners = self.L.repeat(num_samples, 1) # Shape = (num_samples, R)
+
+        for dim, _ in enumerate(self.dims):
+            all_cols = [x[dim] for x in batch_entries]
+            # all_cols = Variable(torch.LongTensor(all_cols))
+            vectors  = self.U[dim][all_cols] # -> shape = (num_samples, R)
+            # Extract all the vectors associated with the entries in the batch
+            involved_vectors[dim, :, :] = vectors
+            inners *= vectors
+
+        phi_batch = inners.sum(dim=1) # shape = (num_samples,)
+
+        for num, entry in enumerate(batch_entries):
+            for dim, col in enumerate(entry):
+                # All other dimensions
+                other_dims = list(range(dim)) + list(range(dim+1,self.ndim))
+                other_vectors = involved_vectors[other_dims, num, :]
+                other_vectors_prod = torch.prod(other_vectors, dim=0) # shape = (R)
+                c_vectors[num, dim, :] = self.L * other_vectors_prod
+
+                all_vectors  = involved_vectors[:, num, :]
+                all_products = self.L * torch.prod(all_vectors, dim=0)
+                d_vectors[num, dim, :] = torch.sum(all_products) - all_products
+
+        return phi_batch, c_vectors, d_vectors
+
 
     def ui_vectors_update(self, batch_entries):
         """
@@ -360,8 +495,12 @@ class EM_online(nn.Module):
         """
         num_samples = len(batch_entries)
         for num, entry in enumerate(batch_entries):
-            for dim, col in enumerate(entry):
-                self.vector_factors[dim][col, :] = self.S_diagonals[dim][col, :] / self.t_vectors[dim][col, :]
+            for dim, row in enumerate(entry):
+                diag = torch.max(self.S[dim][row, :], torch.FloatTensor([0.00001]))
+                # update = self.T[dim][row, :] / self.S[dim][row, :]
+                update = self.T[dim][row, :] / diag
+                self.U[dim][row, :] =  update
+
 
     def report(self, iteration):
         if iteration == 0:
@@ -369,7 +508,8 @@ class EM_online(nn.Module):
 
         train_mae = self.evaluate(self.train_entries, self.train_vals)
         test_mae  = self.evaluate(self.test_entries, self.test_vals)
-        print ("{:^10} {:^10} {:^10}".format(iteration, test_mae, train_mae))
+        print ("{:^10} {:^10} {:^10}".format(iteration, np.around(test_mae,4), np.around(train_mae,4)))
+
 
     def evaluate(self, entries, vals):
         """
@@ -387,9 +527,10 @@ class EM_online(nn.Module):
                 predict = self.binary_predict(entry)
             else:
                 predict = self.count_predict(entry)
-            print("actual: ", val, " predict: ", predict)
+            # print("actual: ", val, " predict: ", predict)
             test_mae += abs(predict - val)/num_entries
         return test_mae
+
 
     def binary_predict(self, entry):
         """
@@ -403,7 +544,7 @@ class EM_online(nn.Module):
         """
         inners = torch.ones(self.R)
         for dim, col in enumerate(entry):
-            inners *= self.vector_factors[dim][col, :]
+            inners *= self.U[dim][col, :]
         f = torch.sum(inners)
         if f > 0:
             return 1
@@ -415,14 +556,15 @@ class EM_online(nn.Module):
         ---
         :return:
 
-        f = exp(P)^yi / (1 + exp(P))^(yi + eps)
+        ll = exp(P)^yi / (1 + exp(P))^(yi + eps)
 
         Do maximum likelihood estimate? or weighted average
         """
         inners = torch.ones(self.R)
         for dim, col in enumerate(entry):
-            inners *= self.vector_factors[dim][col, :]
+            inners *= self.U[dim][col, :]
         f = torch.sum(inners)
+        return f
 
         range_vals = self.max_count - self.min_count + 1
         probs = torch.zeros(range_vals)
@@ -438,6 +580,7 @@ class EM_online(nn.Module):
     # NOTE: to make fair comparisons, not updating Lambda
     def S_lambda_stochastic_compute(self):
         pass
+
 
     def t_lambda_stochastic_compute(self):
         pass

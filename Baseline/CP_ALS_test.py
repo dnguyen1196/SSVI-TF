@@ -4,6 +4,7 @@ from Tensor.binary_tensor import binary_tensor
 from Tensor.count_tensor import count_tensor
 import numpy as np
 
+np.random.seed(42)
 
 def synthesize_tensor(dims, datatype, using_ratio, noise):
     real_dim = 100
@@ -24,7 +25,7 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
     return tensor
 
 
-test_tensor = synthesize_tensor([10,10,10], "count", False, 0)
+test_tensor = synthesize_tensor([20,20,20], "count", False, 0)
 
-factorizer = CPDecompPytorch3D(test_tensor, rank=5)
+factorizer = CPDecompPytorch3D(test_tensor, rank=10)
 factorizer.factorize(10000)

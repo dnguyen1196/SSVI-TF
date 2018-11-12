@@ -37,8 +37,21 @@ class CPDecompPytorch3D(torch.nn.Module):
 
         """
         super().__init__()
-
         self.tensor = tensor
+        self.train_entries = tensor.train_entries
+        self.train_vals    = tensor.train_vals
+        self.test_entries  = tensor.test_entries
+        self.test_vals     = tensor.test_vals
+
+        # Modify train and test vals with 0 and 1
+        for i, val in enumerate(self.train_vals):
+            if val == -1:
+                self.train_vals[i] = 0
+        for i, val in enumerate(self.test_vals):
+            if val == -1:
+                self.test_vals[i] = 0
+
+
         self.dims   = tensor.dims
         self.rank = rank
         self.lambd = lambd
@@ -103,19 +116,19 @@ class CPDecompPytorch3D(torch.nn.Module):
 
     def evaluate(self, iteration):
         if iteration == 0:
-            print(" iteration | test rsme | train rsme |")
+            print(" iteration | test mae  | train mae  |")
 
-        train_rsme, _ = self.evaluate_train_error()
-        test_rsme, _ = self.evaluate_test_error()
-        print ("{:^10} {:^10} {:^10}".format(iteration, test_rsme, train_rsme))
+        train_mae  = self.evaluate_train_error()
+        test_mae   = self.evaluate_test_error()
+        print ("{:^10} {:^10} {:^10}".format(iteration, test_mae, train_mae))
 
     def evaluate_train_error(self):
-        rsme, error = self.evaluate_rsme(self.tensor.train_entries, self.tensor.train_vals)
-        return rsme, error
+        error = self.evaluate_mae(self.tensor.train_entries, self.tensor.train_vals)
+        return error
 
     def evaluate_test_error(self):
-        rsme, error = self.evaluate_rsme(self.tensor.test_entries, self.tensor.test_vals)
-        return rsme, error
+        error = self.evaluate_mae(self.tensor.test_entries, self.tensor.test_vals)
+        return error
 
     def predict_entry(self, entry):
         inner = torch.ones(self.rank)
@@ -126,26 +139,23 @@ class CPDecompPytorch3D(torch.nn.Module):
         if self.datatype == "real":
             return float(torch.sum(inner))
         elif self.datatype == "binary":
-            return 1 if torch.sum(inner) > 0 else -1
+            return 1 if torch.sum(inner) > 0 else 0
         elif self.datatype == "count":
             return float(torch.sum(inner))
 
-    def evaluate_rsme(self, entries, vals):
+    def evaluate_mae(self, entries, vals):
         """
         :param entries:
         :param vals:
         :return:
         """
-        rsme = 0.0
-        error = 0.0
+        mae = 0.0
         num_entries = len(vals)
 
         for i in range(len(entries)):
             entry = entries[i]
             predict = self.predict_entry(entry)
             correct = vals[i]
-            rsme += (predict - correct)**2
+            mae += abs(predict - correct)/num_entries
 
-        rsme = np.sqrt(rsme/num_entries)
-        error = error/num_entries
-        return rsme, error
+        return mae

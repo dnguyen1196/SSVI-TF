@@ -2,14 +2,12 @@
 
 
 # TODO:
-- Implement Torch-SSVI : count tensor blowing up -> log pdf computation is problematic?
+- Update in the natural space, compute gradient with respect to the mean parameters and use that to update
+-> That will involve compute the derivative with respect to the natural parameter of the ELBO and then
+use it in the update (not just simply adding the gradient)
+-> But first, need to nail down the math!!!!
+
 
 - Implement L Carin's group's implementation for poisson likelihoods and binary likelihoods as well
--> test RSME is not changing -> because the algorithm predicts the same number (confirmed)
--> S is not changing or t is not changin?
--> s_update is the same
--> s_cur is different each time (seemingly)
+-> Count prediction is still so bad
 
-
-
-- Could I modify MCMC-SSVI to learn the weight vector for factorization model as well?

@@ -12,7 +12,7 @@ class count_tensor(Tensor):
 
     def generate_hidden_matrices(self, mean=None, cov=None):
         ndim = len(self.dims)
-        mean_array = np.linspace(0, 3, ndim)
+        mean_array = np.linspace(0, 1.5, ndim)
         # Generate the random hidden matrices
         matrices = [[] for _ in range(ndim)]
 

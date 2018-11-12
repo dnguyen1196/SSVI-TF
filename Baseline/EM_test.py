@@ -1,4 +1,4 @@
-from Baseline.SVI import EM_online
+from Baseline.EM import EM_online
 from Tensor.real_tensor import RV_tensor
 from Tensor.binary_tensor import binary_tensor
 from Tensor.count_tensor import count_tensor
@@ -25,8 +25,10 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
     return tensor
 
 
-test_tensor = synthesize_tensor([10,10,10], "binary", False, 0)
-step = lambda x : 0.01
-max_iterations = 1000
-factorizer = EM_online(test_tensor, rank=5)
+test_tensor = synthesize_tensor([20,20,20], "count", False, 0)
+# step = lambda x : 0.1/(x+1)
+step = lambda x : 0.001/(x+1)
+max_iterations = 100000
+factorizer = EM_online(test_tensor, rank=10)
+
 factorizer.optimize(max_iterations, step)
