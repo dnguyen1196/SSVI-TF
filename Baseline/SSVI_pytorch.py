@@ -1,6 +1,8 @@
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.nn import ModuleList, ParameterList, Parameter
+
 from torch.autograd import Variable
 from torch.distributions import MultivariateNormal
 from torch.distributions.poisson import Poisson
@@ -10,29 +12,6 @@ import torch.distributions.kl as KL
 
 import numpy as np
 import math
-
-
-class ListParams(torch.nn.Module):
-    def __init__(self, *args):
-        super(ListParams, self).__init__()
-        idx = 0
-        for module in args:
-            self.add_module(str(idx), module)
-            idx += 1
-
-    def __getitem__(self, idx):
-        if idx < 0 or idx >= len(self._modules):
-            raise IndexError('index {} is out of range'.format(idx))
-        it = iter(self._modules.values())
-        for i in range(idx):
-            next(it)
-        return next(it)
-
-    def __iter__(self):
-        return iter(self._modules.values())
-
-    def __len__(self):
-        return len(self._modules)
 
 
 """
@@ -65,7 +44,7 @@ The question is
 """
 
 class SSVI_torch(torch.nn.Module):
-    def __init__(self, tensor, using_natural_gradient=False, rank=10):
+    def __init__(self, tensor, using_natural_gradient="S", rank=10):
         super().__init__()
 
         self.tensor = tensor
@@ -76,42 +55,31 @@ class SSVI_torch(torch.nn.Module):
         self.datatype = tensor.datatype
         self.using_natural_gradient = using_natural_gradient
 
-        means = []
-        covs  = []
+        self.means = ParameterList()
+        self.chols = ParameterList()
+
         for dim, ncol in enumerate(self.dims):
-            means.append(torch.nn.Embedding(ncol, rank))
-            covs.append(torch.nn.Embedding(ncol, rank))
+            self.means.append(Parameter(torch.randn(ncol, rank), requires_grad=True))
+            self.chols.append(Parameter(torch.randn(ncol, rank), requires_grad=True))
 
-        self.means = ListParams(*means)
-        self.chols = ListParams(*covs)
         self.standard_multi_normal = MultivariateNormal(torch.zeros(rank), torch.eye(rank))
-
         self.sigma = 1
         self.batch_size = 128
         self.lambd = 1/self.batch_size
         self.round_robins_indices = [0 for _ in self.dims]
         self.k1 = 32
 
-    def factorize(self, maxiters, lr=1):
-        # optimizer = optim.Adam(self.parameters(), lr=lr)
-        # optimizer = optim.Adagrad(self.parameters(), lr=lr)
-        # optimizer = optim.RMSprop(self.parameters(), lr=lr)
-        if self.datatype == "real":
-            optimizer = optim.Adagrad(self.parameters(), lr=lr)
-            # optimizer = optim.SGD(self.parameters(), lr=0.01)
-
-        elif self.datatype == "binary":
-            optimizer = optim.Adagrad(self.parameters(), lr=1)
-            # optimizer = optim.SGD(self.parameters(), lr=0.1)
-        elif self.datatype == "count":
-            optimizer = optim.Adagrad(self.parameters(), lr=1)
-            # optimizer = optim.SGD(self.parameters(), lr=0.0000000000001)
+    def factorize(self, maxiters, algorithm="AdaGrad", lr=1, report=[], interval=50):
+        if algorithm == "AdaGrad":
+            optimizer = torch.optim.Adagrad(self.parameters(), lr)
+        elif algorithm == "SGD":
+            optimizer = torch.optim.SGD(self.parameters(), lr)
 
         with torch.enable_grad():
             start = 0
 
             for iteration in range(maxiters):
-                if iteration in [0, 1, 5, 10, 50] or iteration % 100 == 0:
+                if iteration in report or iteration % interval == 0:
                     self.evaluate(iteration)
 
                 for dim, col in enumerate(self.round_robins_indices):
@@ -126,35 +94,172 @@ class SSVI_torch(torch.nn.Module):
                         observed_subset.extend([(self.tensor.train_entries[i], self.tensor.train_vals[i]) for i in range(end)])
                     start = end
 
-                    loss = self.loss_fun(observed_subset)
-                    loss.backward()
+                    expectation_term, kl_loss = self.loss_function_compute(observed_subset)
 
-                    if self.using_natural_gradient:
-                        self.natural_gradient_update(observed_subset)
-
-                    optimizer.step()
+                    # Natural gradient
+                    if self.using_natural_gradient == "N":
+                        self.natural_gradient_update(observed_subset, expectation_term, kl_loss, optimizer)
+                    # Hybrid update
+                    elif self.using_natural_gradient == "H":
+                        self.hybrid_natural_update(observed_subset, expectation_term, kl_loss, optimizer)
+                    else:
+                        loss = -expectation_term + kl_loss
+                        loss.backward()
+                        optimizer.step()
 
                 for dim, col in enumerate(self.round_robins_indices):
                     self.round_robins_indices[dim] += 1
                     self.round_robins_indices[dim] %= self.dims[dim]
 
-    def natural_gradient_update(self, observed_subset):
+
+    def natural_gradient_update(self, observed_subset, expectation_term, kl_term, optimizer):
+        """
+
+        :param observed_subset:
+        :param expectation_term:
+        :param optimizer:
+        :return:
+
+        Mean update
+        1/(L**2)m  = 1/(L**2)m + p [ m - 1/(L**2) + dT/dm + dT/dL m/L ]
+        0.5 / L**2 = 0.5 / L**2 + p [ L**2 - 1/(2L**2) - dT/dL 1/(2L) ]
+
+
+        """
+        entries = [pair[0] for pair in observed_subset]
+        # Compute the gradient of the expectation term with respect to the
+        # parameters of the model
+        # Let pytorch compute the necessary gradient of the expectation term
+        # with respect to the parameters
+        # loss = -expectation_term
+        expectation_term.backward()
+        # loss.backward()
+        # loss = -expectation_term + kl_term
+        # loss.backward()
+
+        L_prev = list()
+
+        for dim, ncol in enumerate(self.dims):
+            all_cols = set([x[dim] for x in entries])
+            all_cols = list(all_cols)
+
+            # Get the GRADIENT of the expectation term wrt
+            # the MEAN and CHOLESKY parameters
+            dm = self.means._parameters[str(dim)].grad[all_cols, :]
+            dL = self.chols._parameters[str(dim)].grad[all_cols, :]
+            m  = self.means._parameters[str(dim)].data[all_cols, :]
+            L  = self.chols._parameters[str(dim)].data[all_cols, :]
+
+            L_prev.append(L)
+
+            # Compute the natural gradient required for natural parameter
+            # Note that pytorch does MINUS gradient * stepsize
+            # and we're doing gradient ascent
+            # natural_mean_grad = (m - m / L**2 + dm + dL * m/L) * -1
+
+
+            # Roni's derivations: dT/dh = dT/dm - 2dT/dS dm
+            natural_mean_grad = (m - m / L ** 2 + dm - dL * m / L) * -1
+            natural_chol_grad = (L**2 - 0.5 * 1/L**2 - dL * 1/ (2*L)) * -1
+
+            # Precompute
+            # m -> m/L**2
+            self.means._parameters[str(dim)].data[all_cols, :] = m/L**2
+            # L -> 0.5 /L**2
+            self.chols._parameters[str(dim)].data[all_cols, :] = 0.5 * L**2
+
+            # Replace the gradient with the natural gradient
+            self.means._parameters[str(dim)].grad[all_cols, :] = natural_mean_grad
+            self.chols._parameters[str(dim)].grad[all_cols, :] = natural_chol_grad
+
+        # Do one step of update
+        optimizer.step()
+
+        # Re-update the parameters
+        for dim, ncol in enumerate(self.dims):
+            all_cols = set([x[dim] for x in entries])
+            all_cols = list(all_cols)
+
+            # The current covariance parameter being stored is 0.5/L**2
+            # 0.5/L**2 = x => L = sqrt(0.5/x)
+            L_natural = self.chols._parameters[str(dim)].data[all_cols, :]
+            L_squared = 0.5/L_natural
+            L_squared = F.relu(L_squared) + 1e-4
+            # L_squared = torch.max(L_squared, torch.FloatTensor([1e-4]))
+
+            # The current mean parameter being stored is m/L**2
+            # m/L**2 =   => m = L**2 x
+            m_natural = self.means._parameters[str(dim)].data[all_cols, :]
+            m_new = L_squared * m_natural
+
+            L_new = torch.sqrt(L_squared)
+            # L[torch.isnan(L)] = 0.1
+            self.means._parameters[str(dim)].data[all_cols, :] = m_new
+            self.chols._parameters[str(dim)].data[all_cols, :] = L_new
+
+
+    def hybrid_natural_update(self, observed_subset, expectation_term, kl_term, optimizer):
         # If using natural gradient
         entries = [pair[0] for pair in observed_subset]
 
+        # Total loss
+        total_loss = -expectation_term + kl_term
+        total_loss.backward(retain_graph=True)
+        # Zeros out the Cholesky factor
         for dim, ncol in enumerate(self.dims):
-            all_cols = [x[dim] for x in entries]
-            all_cols = Variable(torch.LongTensor(all_cols))
+            all_cols = set([x[dim] for x in entries])
+            all_cols = list(all_cols)
+            # Get the GRADIENT of total loss with respect to the CHOLESKY factors
+            self.chols._parameters[str(dim)].grad[all_cols, :].data.zero_()
 
-            all_ms = self.means[dim](all_cols) # shape = (num_samples, rank)
-            all_Ls = self.chols[dim](all_cols) # shape = (num_samples, rank)
+        # Update the mean parameter via standard gradient
+        optimizer.step()
 
-    def loss_fun(self, observed):
+        # Update the cholesky factor via natural gradient
+        # Loss term from expectation
+        optimizer.zero_grad()
+        expectation_term.backward()
+        # Update the Cholesky factors via Natural gradient
+        for dim, ncol in enumerate(self.dims):
+            all_cols = set([x[dim] for x in entries])
+            all_cols = list(all_cols)
+
+            # Get the GRADIENT of the expectation term wrt
+            # CHOLESKY parameters
+            dL = self.chols._parameters[str(dim)].grad[all_cols, :]
+            L  = self.chols._parameters[str(dim)].data[all_cols, :]
+
+            # Zeros out grad for mean parameters
+            self.means._parameters[str(dim)].grad[all_cols, :].data.zero_()
+
+            # Compute the natural gradient required for natural parameter
+            natural_chol_grad = (L**2 - 0.5 * 1/L**2 - dL * 1/ (2*L)) #* -1
+
+            # Replace the gradient with the natural gradient
+            self.chols._parameters[str(dim)].grad[all_cols, :] = natural_chol_grad
+            # Flip the cholesky decomposition and square it
+            self.chols._parameters[str(dim)].data[all_cols, :] = 1/L**2
+
+        # Do one step of update
+        optimizer.step()
+
+        # Re-Flip the Cholesky decomposition
+        for dim, ncol in enumerate(self.dims):
+            all_cols = set([x[dim] for x in entries])
+            all_cols = list(all_cols)
+            L_natural = self.chols._parameters[str(dim)].data[all_cols, :]
+            L_squared = 0.5/L_natural
+            # L_new     = torch.sqrt(F.relu(L_squared) + 1e-4)
+            L_new     = torch.sqrt(F.relu(L_squared)) + 1e-4
+
+            self.chols._parameters[str(dim)].data[all_cols, :] = L_new
+
+
+    def loss_function_compute(self, observed):
         """
         :param observed:
         :return:
         """
-        loss = torch.zeros(1)
         entries = [pair[0] for pair in observed]
         ys = Variable(torch.FloatTensor([pair[1] for pair in observed]))
 
@@ -167,9 +272,11 @@ class SSVI_torch(torch.nn.Module):
         batch_kl = self.compute_batch_kl_term(entries)
 
         # loss -= self.num_train/self.batch_size * batch_expectation + (1/ (self.batch_size * self.ndim)) * batch_kl
-        loss -= self.num_train / self.batch_size * batch_expectation + (1 / (self.batch_size )) * batch_kl
+        expectation_term = self.num_train / self.batch_size * batch_expectation
+        kl_loss          =  (1 / (self.batch_size )) * batch_kl
 
-        return loss
+        return expectation_term, kl_loss
+
 
     def compute_batch_expectation_term(self, entries, ys):
         num_samples = len(entries)
@@ -178,10 +285,10 @@ class SSVI_torch(torch.nn.Module):
         element_mult_samples = torch.ones(num_samples, self.k1, self.rank) # shape = (num_samples, k1, rank)
         for dim, ncol in enumerate(self.dims):
             all_cols = [x[dim] for x in entries]
-            all_cols = Variable(torch.LongTensor(all_cols))
+            # all_cols = Variable(torch.LongTensor(all_cols))
 
-            all_ms = self.means[dim](all_cols) # shape = (num_samples, rank)
-            all_Ls = self.chols[dim](all_cols) # shape = (num_samples, rank)
+            all_ms = self.means[dim][all_cols, :] # shape = (num_samples, rank)
+            all_Ls = self.chols[dim][all_cols, :] # shape = (num_samples, rank)
 
             epsilon_tensor = self.standard_multi_normal.sample((num_samples, self.k1)) # shape = (num_sample, k1, rank)
 
@@ -215,10 +322,10 @@ class SSVI_torch(torch.nn.Module):
         kl = 0.
         for dim, ncol in enumerate(self.dims):
             all_cols = [x[dim] for x in entries]
-            all_cols = Variable(torch.LongTensor(all_cols))
+            # all_cols = Variable(torch.LongTensor(all_cols))
 
-            all_ms = self.means[dim](all_cols) # shape = (num_samples, rank)
-            all_Ls = self.chols[dim](all_cols) # shape = (num_samples, rank)
+            all_ms = self.means[dim][all_cols, :] # shape = (num_samples, rank)
+            all_Ls = self.chols[dim][all_cols, :] # shape = (num_samples, rank)
             all_S  = all_Ls ** 2
 
             kl_div = KL._kl_normal_normal(Normal(all_ms, all_S), Normal(0, 1))
@@ -279,15 +386,6 @@ class SSVI_torch(torch.nn.Module):
 
         This gives the most trouble because of
         """
-        # exp_f = torch.exp(fs_samples)
-        # lamb  = torch.log(1 + exp_f)
-        # # lamb  = torch.log(fs_samples)
-        #
-        # nan_indices = torch.isnan(lamb)
-        # lamb[nan_indices] = fs_samples[nan_indices]
-        # neg_indices = fs_samples < 0
-        # lamb = fs_samples
-        # lamb[neg_indices] = 0.
         lamb = F.relu(fs_samples, inplace=True)
         # Compute log likelihood
         dist = Poisson(lamb)
@@ -340,12 +438,11 @@ class SSVI_torch(torch.nn.Module):
         # TODO: generalize to other likelihood types
         inner = torch.ones(self.rank)
         for dim, col in enumerate(entry):
-            col = Variable(torch.LongTensor([col]))
-            inner *= self.means[dim](col)[0]
+            inner *= self.means[dim][col, :]
 
         if self.datatype == "real":
             return float(torch.sum(inner))
         elif self.datatype == "binary":
             return 1 if torch.sum(inner) > 0 else -1
         elif self.datatype == "count":
-            return float(torch.sum(inner))
+            return float(torch.sum(F.relu(inner)))

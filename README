@@ -2,10 +2,9 @@
 
 
 # TODO:
-- Update in the natural space, compute gradient with respect to the mean parameters and use that to update
--> That will involve compute the derivative with respect to the natural parameter of the ELBO and then
-use it in the update (not just simply adding the gradient)
--> But first, need to nail down the math!!!!
+- Natural space update still so bad
+-> Note that there is a scaling factor in the update formula
+-> Try keeping track of the changes in gradient and covariances
 
 
 - Implement L Carin's group's implementation for poisson likelihoods and binary likelihoods as well

@@ -26,9 +26,9 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
     return tensor
 
 
-test_tensor = synthesize_tensor([20,20,20], "count", False, 0)
+test_tensor = synthesize_tensor([20,20], "real", False, 0)
 # test_tensor.reduce_train_size()
-natural_gradient = True
+natural_gradient = "H"
 factorizer = SSVI_torch(test_tensor, using_natural_gradient=natural_gradient, rank=10)
 
-factorizer.factorize(10000)
+factorizer.factorize(10000, algorithm="AdaGrad", lr=1, report=[0,1,2,3,4,5,6], interval=10)
