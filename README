@@ -3,8 +3,17 @@
 
 # TODO:
 - Natural space update still so bad
--> Note that there is a scaling factor in the update formula
+-> Note that there is a scaling factor in the update formula -> may be I still need to do round-robbins update
 -> Try keeping track of the changes in gradient and covariances
+-> Detach the gradient from column and dim not involved?
+-> Sanity check, run loss.backward(), save mean gradient, run loss.backward() again
+-> The covariance update is unstable, giving me problems
+
+theta_q = (1 - p) theta_q + p(theta_p + N/|M| sum dT/deta_q)
+
+-> Sanity check standard update does not produce the same results as standard update
+-> May be the way pytorch's adagrad works is differet :|
+-> Parameters -> right now I have Parameter(matrix) -> can I have parameter[parameter[]]
 
 
 - Implement L Carin's group's implementation for poisson likelihoods and binary likelihoods as well

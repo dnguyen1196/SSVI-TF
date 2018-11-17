@@ -7,7 +7,7 @@ import numpy as np
 np.random.seed(42)
 
 def synthesize_tensor(dims, datatype, using_ratio, noise):
-    real_dim = 50
+    real_dim = 20
     means = [np.ones((real_dim,)) * 1, np.ones((real_dim,)) * 4, np.ones((real_dim,)) * 2]
     covariances = [np.eye(real_dim) * 0.5, np.eye(real_dim) * 0.5, np.eye(real_dim) * 0.5]
 
@@ -26,9 +26,12 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
     return tensor
 
 
-test_tensor = synthesize_tensor([20,20], "real", False, 0)
-# test_tensor.reduce_train_size()
-natural_gradient = "H"
-factorizer = SSVI_torch(test_tensor, using_natural_gradient=natural_gradient, rank=10)
+# test_tensor = synthesize_tensor([50,50, 50], "real", False, 0)
+# test_tensor.reduce_train_size(0.05)
+
+test_tensor = synthesize_tensor([20, 20], "real", False, 0)
+
+natural_gradient = "S"
+factorizer = SSVI_torch(test_tensor, using_natural_gradient=natural_gradient, rank=3)
 
 factorizer.factorize(10000, algorithm="AdaGrad", lr=1, report=[0,1,2,3,4,5,6], interval=10)
