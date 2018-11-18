@@ -3,14 +3,23 @@
 
 # TODO:
 - Natural space update still so bad
--> Note that there is a scaling factor in the update formula -> may be I still need to do round-robbins update
--> Try keeping track of the changes in gradient and covariances
--> Detach the gradient from column and dim not involved?
--> Sanity check, run loss.backward(), save mean gradient, run loss.backward() again
--> The covariance update is unstable, giving me problems
+-> At least now the algorithm keeps track of separate gradient for each parameter
+-> Instability issues -> switch to non-round robbins
+-> Update formulas are wrong -> there is a scaling factor associated with the derivative term>
+-> Why does the optimizer loop through the parameters twice
+
+-> So it seems Natural gradient descent with decay and round robins update kinda converges for real data -> but
+it must be lr =0.001, decay=0.1 (in other words it needs tuning)
+-> when initializing L=1 -> error goes down a lot more
+
+-> The scaling!!! with the derivative term?? but removing it from natural-round-robbins doesnt seem to make a diff
+-> zero_grad ?? always zero_grad and stores the gradient instead of relying on optimizer?
+
+-> at least now the hybrid approach seems to be working
+-> standard gradient now has instability issues like wtf
+
 
 theta_q = (1 - p) theta_q + p(theta_p + N/|M| sum dT/deta_q)
-
 -> Sanity check standard update does not produce the same results as standard update
 -> May be the way pytorch's adagrad works is differet :|
 -> Parameters -> right now I have Parameter(matrix) -> can I have parameter[parameter[]]
