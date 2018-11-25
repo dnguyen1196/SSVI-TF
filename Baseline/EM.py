@@ -85,7 +85,7 @@ class EM_online(nn.Module):
         self.datatype = tensor.datatype
         self.tensor = tensor
         if self.datatype == "count":
-            self.overdispersion_param = 1
+            self.overdispersion_param = 0.5
             self.max_count = tensor.max_count
             self.min_count = tensor.min_count
 

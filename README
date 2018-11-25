@@ -3,10 +3,13 @@
 
 # TODO:
 - Natural space update still so bad
--> torch loss is -inf
--> derivative with respect to L is NAN
+-> N-update seems to get stuck at some local optimum
+-> batch elbo always evaluates to -inf (log 0) -> KL term??
+-> same thing with S update -> 0
+->  L gets updated to 0 vector -> shitty initialization
+-> For natural update -> L gets negative
 
-
+-> Check KL computations
 
 - Implement L Carin's group's implementation for poisson likelihoods and binary likelihoods as well
 -> Count prediction is still so bad

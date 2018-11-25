@@ -64,7 +64,7 @@ class SSVI_torch(torch.nn.Module):
             cov_list  = ParameterList()
             for _ in range(ncol):
                 mean_list.append(Parameter(torch.randn(rank), requires_grad=True))
-                cov_list.append(Parameter(torch.ones(rank), requires_grad=True))
+                cov_list.append(Parameter(torch.ones(rank) + 1/4 * torch.randn(rank), requires_grad=True))
 
             self.means.append(mean_list)
             self.chols.append(cov_list)
@@ -87,20 +87,24 @@ class SSVI_torch(torch.nn.Module):
         :return:
         """
         if algorithm == "Adagrad":
-            optimizer = torch.optim.Adagrad(self.parameters(), lr, weight_decay=0.1)
+            optimizer = torch.optim.Adagrad(self.parameters(), lr)
         elif algorithm == "SGD":
-            optimizer = torch.optim.SGD(self.parameters(), lr, weight_decay=0.1)
+            optimizer = torch.optim.SGD(self.parameters(), lr, weight_decay=0.01)
         elif algorithm == "Adam":
             optimizer = torch.optim.Adam(self.parameters(), lr, weight_decay=0.1)
         elif algorithm == "Adadelta":
             optimizer = torch.optim.Adadelta(self.parameters(), lr)
+        elif algorithm == "Adamax":
+            optimizer = torch.optim.Adamax(self.parameters(), lr)
 
         with torch.enable_grad():
             start = 0
+            expectation_term = 0.
+            kl_term = 0.
 
             for iteration in range(maxiters):
                 if iteration in report or iteration % interval == 0:
-                    self.evaluate(iteration)
+                    self.evaluate(iteration, expectation_term, kl_term)
 
                 for dim, col in enumerate(self.round_robins_indices):
                     # optimizer.zero_grad()
@@ -119,8 +123,10 @@ class SSVI_torch(torch.nn.Module):
                     # Natural gradient
                     if self.gradient_update == "N":
                         # self.natural_gradient_update(observed_subset, expectation_term, kl_term, optimizer)
-                        self.natural_gradient_update_round_robins(expectation_term, kl_term, optimizer, num_sample, num_observed_i, dim, col)
+                        # self.natural_gradient_update_round_robins(expectation_term, kl_term, optimizer, num_sample, num_observed_i, dim, col)
                         # self.natural_gradient_update_v2(observed_subset, expectation_term, kl_term, optimizer)
+                        self.natural_gradient_update_round_robins_v2(expectation_term, kl_term, optimizer, num_sample,
+                                                                  num_observed_i, dim, col)
 
                     # Hybrid update
                     elif self.gradient_update == "H":
@@ -161,8 +167,8 @@ class SSVI_torch(torch.nn.Module):
         return observed_subset, len(observed)
 
     def standard_gradient_update_round_robins(self, expectation_term, kl_term, optimizer, dim, col):
-        loss = -self.num_train/self.batch_size * expectation_term + kl_term
-        # loss = expectation_term + kl_term
+        # loss = -self.num_train/self.batch_size * expectation_term + kl_term
+        loss = -expectation_term + kl_term
         loss.backward()
 
         dm = copy.deepcopy(self.means[dim][col].grad)
@@ -179,7 +185,6 @@ class SSVI_torch(torch.nn.Module):
 
     def natural_gradient_update_round_robins(self, expectation_term, kl_term, optimizer, num_sample, num_observed_i, dim, col):
         """
-
         :param expectation_term:
         :param kl_term:
         :param optimizer:
@@ -205,56 +210,160 @@ class SSVI_torch(torch.nn.Module):
         scale = num_observed_i/num_sample
 
         G_mean = (dm - dL * m / L)
+        natural_mean_grad = (m - m / L ** 2 - scale * G_mean) * -1
+
+        G_chol = -dL * 1 / (2 * L)
+        natural_chol_grad = ((L ** 2) - 0.5 * 1 / (L ** 2) + scale * G_chol) * -1
+
+        optimizer.zero_grad() # Remove the grad of other factors
+
+        # Replace the gradient with the natural gradient
+        nat_update_for_mean = False
+        if not torch.any(torch.isnan(natural_mean_grad)):
+            self.means[dim][col].grad = natural_mean_grad
+            nat_update_for_mean = True
+        else:
+            self.means[dim][col].grad = -dm
+
+
+        # If "unstable" do a standard gradient update
+        nat_update_for_chol = False
+        if not torch.any(torch.isnan(natural_chol_grad)) and nat_update_for_mean:
+            self.chols[dim][col].grad = natural_chol_grad
+            nat_update_for_chol = True
+        else:
+            self.chols[dim][col].grad = -dL
+
+        # Compute the natural parameters for the affected columns
+        if nat_update_for_mean:
+            # m -> m/L**2
+            self.means[dim][col].data = m/(L**2)
+
+        if nat_update_for_chol:
+            # L -> 0.5 /L**2
+            self.chols[dim][col].data = 0.5 / (L**2)
+
+        optimizer.step()
+
+        if nat_update_for_chol and nat_update_for_mean:
+            # The current covariance parameter being stored is 0.5/L**2
+            # 0.5/L**2 = x => L = sqrt(0.5/x)
+            L_natural = copy.deepcopy(self.chols[dim][col].data)
+            L_squared = 0.5 / L_natural
+            # L_squared = F.relu(L_squared) + 1e-4
+
+            # The current mean parameter being stored is m/L**2
+            # m/L**2 =   => m = L**2 x
+            m_natural = copy.deepcopy(self.means[dim][col].data)
+            m_new = L_squared * m_natural
+            L_new = torch.sqrt(L_squared)
+
+            # Convert from natural parameter form to standard form
+            if not torch.any(torch.isnan(m_new)) and not torch.any(torch.isinf(m_new)):
+                self.means[dim][col].data = m_new
+            else:
+                self.means[dim][col].data = m
+
+            if not torch.any(torch.isnan(L_new)):
+                self.chols[dim][col].data = L_new
+            else:
+                self.chols[dim][col].data = L
+
+
+    def natural_gradient_update_round_robins_v2(self, expectation_term, kl_term, optimizer, num_sample, num_observed_i, dim, col):
+        """
+        :param expectation_term:
+        :param kl_term:
+        :param optimizer:
+        :param num_sample:
+        :param num_observed_i:
+        :param dim:
+        :param col:
+        :return:
+        """
+        # Automatically compute the derivative with respect to the parameters
+        expectation_term.backward(retain_graph=True)
+
+        dm = copy.deepcopy(self.means[dim][col].grad)
+        dL = copy.deepcopy(self.chols[dim][col].grad)
+        m = copy.deepcopy(self.means[dim][col].data)
+        L = copy.deepcopy(self.chols[dim][col].data)
+
+        optimizer.zero_grad()
+
+        # Compute the natural gradient required for natural parameter
+        scale = num_observed_i / num_sample
+
+        # Compute the natural gradient
+        G_mean = (dm - dL * m / L)
         natural_mean_grad = (m - m / L ** 2 + scale * G_mean) * -1
 
         G_chol = -dL * 1 / (2 * L)
         natural_chol_grad = ((L ** 2) - 0.5 * 1 / (L ** 2) + scale * G_chol) * -1
 
-        # Compute the natural parameters for the affected columns
-        # m -> m/L**2
-        self.means[dim][col].data = m/(L**2)
-        # L -> 0.5 /L**2
-        # self.chols[dim][col].data = 0.5 / (L**2)
+        # Note that pytorch does MINUS gradient * stepsize
+        # and we're doing gradient ascent
+        # natural_mean_grad = (m - m / L**2 + dm + dL * m/L) * -1
+        # Roni's derivations: dT/dh = dT/dm - 2dT/dS dm
 
-        optimizer.zero_grad() # Remove the grad of other factors
-
-        # Replace the gradient with the natural gradient
-        if not torch.any(torch.isnan(natural_mean_grad)):
+        if torch.any(torch.isnan(natural_mean_grad)) or torch.any(torch.isnan(natural_chol_grad)):
+            self.standard_gradient_update_round_robins(expectation_term, kl_term, optimizer, dim, col)
+            L_new = self.chols[dim][col]
+            L_new[L_new < 0] = 1
+        else:
+            # Replace the gradient with the natural gradient
+            # nat_update_for_mean = False
+            # if not torch.any(torch.isnan(natural_mean_grad)):
             self.means[dim][col].grad = natural_mean_grad
-        else:
-            # print("Using standard update for mean")
-            self.means[dim][col].data = m
-            self.means[dim][col].grad = dm
+                # nat_update_for_mean = True
+            # else:
+            #     self.means[dim][col].grad = -dm
+
+
+            # If "unstable" do a standard gradient update
+            # nat_update_for_chol = False
+            # if not torch.any(torch.isnan(natural_chol_grad)) and nat_update_for_mean:
+            self.chols[dim][col].grad = natural_chol_grad
+                # nat_update_for_chol = True
+            # else:
+            #     self.chols[dim][col].grad = -dL
+
+            # Compute the natural parameters for the affected columns
+            # if nat_update_for_mean:
+                # m -> m/L**2
+            self.means[dim][col].data = m/(L**2)
+
+            # if nat_update_for_chol:
+                # L -> 0.5 /L**2
+            self.chols[dim][col].data = 0.5 / (L**2)
+
             optimizer.step()
-            return
 
-        # if not torch.any(torch.isnan(natural_chol_grad)):
-        #     self.chols[dim][col].grad = natural_chol_grad
-        optimizer.step()
+            # if nat_update_for_chol and nat_update_for_mean:
+                # The current covariance parameter being stored is 0.5/L**2
+                # 0.5/L**2 = x => L = sqrt(0.5/x)
+            L_natural = copy.deepcopy(self.chols[dim][col].data)
+            L_squared = 0.5 / L_natural
+            L_squared[L_squared < 0 ] = 0.5
 
-        # The current covariance parameter being stored is 0.5/L**2
-        # 0.5/L**2 = x => L = sqrt(0.5/x)
-        # L_natural = copy.deepcopy(self.chols._parameters[str(dim)].data[col, :])
-        L_natural = copy.deepcopy(self.chols[dim][col].data)
-        L_squared = 0.5 / L_natural
-        L_squared = F.relu(L_squared) + 1e-4
+            # The current mean parameter being stored is m/L**2
+            # m/L**2 =   => m = L**2 x
+            m_natural = copy.deepcopy(self.means[dim][col].data)
+            m_new = L_squared * m_natural
+            L_new = torch.sqrt(L_squared)
 
-        # The current mean parameter being stored is m/L**2
-        # m/L**2 =   => m = L**2 x
-        m_natural = copy.deepcopy(self.means[dim][col].data)
-        m_new = L_squared * m_natural
-        L_new = torch.sqrt(L_squared)
-
-        # Convert from natural parameter form to standard form
-        if not torch.any(torch.isnan(m_new)) and not torch.any(torch.isinf(m_new)):
+            # Convert from natural parameter form to standard form
+            # if not torch.any(torch.isnan(m_new)) and not torch.any(torch.isinf(m_new)):
             self.means[dim][col].data = m_new
-        else:
-            self.means[dim][col].data = m
+            self.chols[dim][col].data = L_new
+                # # else:
+                # #     self.means[dim][col].data = m
+                #
+                # if not torch.any(torch.isnan(L_new)):
+                #     self.chols[dim][col].data = L_new
+                # else:
+                #     self.chols[dim][col].data = L
 
-        # if not torch.any(torch.isnan(L_new)):
-        #     self.chols[dim][col].data = L_new
-        # else:
-        self.chols[dim][col].data = L
 
     def natural_gradient_update(self, observed_subset, expectation_term, kl_term, optimizer):
         """
@@ -618,7 +727,8 @@ class SSVI_torch(torch.nn.Module):
 
     def hybrid_gradient_update_round_robins(self, expectation_term, kl_term, optimizer, num_sample, num_observed_i, dim, col):
         # Automatically compute the derivative with respect to the parameters
-        standard_loss = -self.num_train/self.batch_size * expectation_term + kl_term
+        # standard_loss = -self.num_train/self.batch_size * expectation_term + kl_term
+        standard_loss = -expectation_term + kl_term
         standard_loss.backward(retain_graph=True)
 
         dm = copy.deepcopy(self.means[dim][col].grad)
@@ -741,22 +851,27 @@ class SSVI_torch(torch.nn.Module):
 
     def compute_batch_kl_term(self, entries):
         kl = 0.
+
         for dim, _ in enumerate(self.dims):
             all_rows = [x[dim] for x in entries]
             # all_cols = Variable(torch.LongTensor(all_cols))
 
             all_ms = torch.stack([self.means[dim][row] for row in all_rows], dim=0)
             all_Ls = torch.stack([self.chols[dim][row] for row in all_rows], dim=0)
+            all_S = all_Ls ** 2
 
-            # all_ms = self.means[dim][all_cols, :] # shape = (num_samples, rank)
-            # all_Ls = self.chols[dim][all_cols, :] # shape = (num_samples, rank)
-            all_S  = all_Ls ** 2
+            # KL(N0 || N1) = 0.5 (tr(S1^-1 S0) + (m1-m0)^T S1^-1 (m1-m0) - D + ln(|S_1|/|S_0|)
+            # When N1 = N(0, I)
+            # KL(N0 || N(0, I)) = 0.5 (tr(S0) + m0^T m0 - D + ln(1/|S_0|)
 
-            kl_div = KL._kl_normal_normal(Normal(all_ms, all_S), Normal(0, 1))
-            kl_div = torch.sum(kl_div)
+            kl_batch = 0.5 * torch.sum(-self.rank + torch.sum(all_S, dim=1) + torch.sum(all_ms**2, dim=1) - torch.log(1/torch.prod(all_S, dim=1)))
 
-            kl -= kl_div
+            # all_S  = all_Ls ** 2
+            # kl_div = KL._kl_normal_normal(Normal(all_ms, all_S), Normal(0, 1))
+            # kl_div = torch.sum(kl_div)
+            # kl -= kl_div
             # kl -= 0.5 * torch.sum(1 + torch.log(all_S ** 2) - all_ms**2 - all_S**2)
+
         return kl
 
     def compute_log_pdf(self, fs_samples, target_matrix):
@@ -788,6 +903,7 @@ class SSVI_torch(torch.nn.Module):
         """
         dist = Normal(fs_samples, 1)
         log_pdf = dist.log_prob(target_matrix)
+        # log_pdf = torch.max(log_pdf, torch.FloatTensor([-100]))
         return log_pdf
 
     def compute_log_pdf_bernoulli(self, fs_samples, target_matrix):
@@ -824,13 +940,16 @@ class SSVI_torch(torch.nn.Module):
 
         return log_pdf
 
-    def evaluate(self, iteration):
+    def evaluate(self, iteration, expectation, kl):
         if iteration == 0:
-            print(" iteration | test mae  | train mae |")
+            print(" iteration | test mae  | train mae |  E-term  |    KL   |")
 
         train_mae = self.evaluate_train_error()
         test_mae = self.evaluate_test_error()
-        print ("{:^10} {:^10} {:^10}".format(iteration, test_mae, train_mae))
+        # expectation_term = expectation.detach().numpy()
+        # kl_term = kl.detach().numpy()
+        print ("{:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(test_mae, 4), np.around(train_mae, 4), \
+                                                    expectation, kl))
 
     def evaluate_train_error(self):
         mae = self.evaluate_mae(self.tensor.train_entries, self.tensor.train_vals)

@@ -27,7 +27,7 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
 
 test_tensor = synthesize_tensor([20,20,20], "count", False, 0)
 # step = lambda x : 0.1/(x+1)
-step = lambda x : 0.001/(x+1)
+step = lambda x : 0.001
 max_iterations = 100000
 factorizer = EM_online(test_tensor, rank=10)
 

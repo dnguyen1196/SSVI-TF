@@ -4,7 +4,7 @@ from Tensor.binary_tensor import binary_tensor
 from Tensor.count_tensor import count_tensor
 import numpy as np
 
-# np.random.seed(42)
+np.random.seed(42)
 
 def synthesize_tensor(dims, datatype, using_ratio, noise):
     real_dim = 20
@@ -29,14 +29,14 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
 # test_tensor = synthesize_tensor([50,50, 50], "real", False, 0)
 # test_tensor.reduce_train_size(0.05)
 
-test_tensor = synthesize_tensor([10, 10, 10], "real", True, 0.05)
+test_tensor = synthesize_tensor([20, 20, 20], "real", True, 0.05)
 # test_tensor.reduce_train_size(0.05)
 
-gradient_update = "S"
-factorizer = SSVI_torch(test_tensor, gradient_update=gradient_update, rank=5)
+gradient_update = "H"
+factorizer = SSVI_torch(test_tensor, gradient_update=gradient_update, rank=4)
 
-# factorizer.factorize(10000, algorithm="SGD", lr=0.001, report=[0,1,2,3,4,5,6], interval=10)
+# factorizer.factorize(10000, algorithm="SGD", lr=0.001, report=[0,1,2], interval=10)
 
-factorizer.factorize(10000, algorithm="Adagrad", lr=1, report=[0,1,2,3,4,5,6], interval=10)
+# factorizer.factorize(10000, algorithm="Adadelta", lr=1, report=[0,1,2], interval=10)
 
-# factorizer.factorize(10000, algorithm="SGD", lr=0.0001, report=[0,1,2,3,4,5,6], interval=10)
+factorizer.factorize(10000, algorithm="Adagrad", lr=1, report=[0,1,2], interval=10)
