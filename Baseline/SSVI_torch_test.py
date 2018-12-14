@@ -32,11 +32,15 @@ def synthesize_tensor(dims, datatype, using_ratio, noise):
 test_tensor = synthesize_tensor([20, 20, 20], "real", True, 0.05)
 # test_tensor.reduce_train_size(0.05)
 
-gradient_update = "H"
-factorizer = SSVI_torch(test_tensor, gradient_update=gradient_update, rank=4)
+gradient_update = "N"
+rank = 10
 
-# factorizer.factorize(10000, algorithm="SGD", lr=0.001, report=[0,1,2], interval=10)
+factorizer = SSVI_torch(test_tensor, gradient_update=gradient_update, rank=rank)
 
-# factorizer.factorize(10000, algorithm="Adadelta", lr=1, report=[0,1,2], interval=10)
+# factorizer.factorize(10000, algorithm="SGD", lr=0.0001, report=[0,1,2], interval=10)
+
+# factorizer.factorize(10000, algorithm="Adam", lr=0.1, report=[0,1,2], interval=10)
+
+# factorizer.factorize(10000, algorithm="RMSProp", lr=1, report=[0,1,2], interval=10)
 
 factorizer.factorize(10000, algorithm="Adagrad", lr=1, report=[0,1,2], interval=10)
