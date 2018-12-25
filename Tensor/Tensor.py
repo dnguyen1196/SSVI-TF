@@ -16,7 +16,6 @@ class Tensor(object):
         :param binary_cutoff:
         """
         assert(datatype in ["real", "ordinal", "count", "binary"])
-
         self.datatype = datatype
 
 
@@ -190,135 +189,11 @@ class Tensor(object):
 
         return self.data_link_fun(f)
 
+
     @abstractmethod
     def data_link_fun(self, f):
         raise NotImplementedError
 
-    """
-    THE OLD WAY OF GENERATING DATA
-    """
-    def synthesize_real_data(self, dims, means, covariances, D=20, train=0.8, sparsity=1, noise=1.):
-        """
-        :param dims:
-        :param means:
-        :param covariances:
-        :param D:
-        :param train:
-        :param sparsity:
-        :return:
-        """
-        print("Generating synthetic real-valued data ... ")
-        start = time.time()
-        self.dims = dims
-        self.datatype = "real"
-
-        ndim = len(dims)
-        matrices = [[]] * ndim
-        # Generate the random hidden matrices
-
-        for i in range(ndim):
-            matrices[i] = self.create_random_matrix(dims[i], D, means[i], covariances[i])
-
-        total         = np.prod(dims) # Total number of possible entries
-        observed_num  = int(total * sparsity) # Number of observed_by_id entries
-        train_size    = int(observed_num * train) # training set size
-
-        observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices, noise)
-
-        self.test_entries  = observed_entries[train_size :]
-        self.test_vals     = observed_vals[train_size :]
-        self.train_entries = observed_entries[: train_size]
-        self.train_vals    = observed_vals[: train_size]
-
-        end = time.time()
-        print("Generating synthetic real-valued data took: ", end- start)
-
-    def synthesize_binary_data(self, dims, D=20, train=0.8, sparsity=1, noise=1.):
-        print("Generating synthetic binary data ... ")
-
-        start = time.time()
-        self.dims = dims
-        self.datatype = "binary"
-
-        ndim = len(dims)
-        matrices = [[]] * ndim
-
-        mean_array = np.linspace(-1, 1, ndim)
-        # Generate the random hidden matrices
-        for i in range(ndim):
-            mean = np.ones((D,)) * mean_array[i]
-            cov  = np.eye(D)     * 0.1
-            matrices[i] = self.create_random_matrix(dims[i], D, mean, cov)
-
-        total         = np.prod(dims) # Total number of possible entries
-        observed_num  = int(total * sparsity) # Number of observed_by_id entries
-        train_size    = int(observed_num * train) # training set size
-
-        observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices, noise)
-
-        self.test_entries  = observed_entries[train_size :]
-        self.test_vals     = observed_vals[train_size :]
-        self.train_entries = observed_entries[: train_size]
-        self.train_vals    = observed_vals[: train_size]
-
-        end = time.time()
-        print("Generating synthetic binary data took: ", end- start)
-
-    def synthesize_count_data(self, dims, D=20, train=0.8, sparsity=1, noise=1.):
-        """
-        :param dims:
-        :param D:
-        :param train:
-        :param sparsity:
-        :return:
-        """
-        print("Generating synthetic count data ... ")
-        start = time.time()
-        self.dims = dims
-        self.datatype = "count"
-        self.min_count = 100
-        self.max_count = 0
-
-        ndim = len(dims)
-        matrices = [[]] * ndim
-
-        mean_array = np.linspace(0, 3, ndim)
-        # Generate the random hidden matrices
-        for i in range(ndim):
-            mean = np.ones((D,)) * mean_array[i]
-            cov  = np.eye(D)     * 0.1
-            matrices[i] = self.create_random_matrix(dims[i], D, mean, cov)
-
-        total         = np.prod(dims) # Total number of possible entries
-        observed_num  = int(total * sparsity) # Number of observed_by_id entries
-        train_size    = int(observed_num * train) # training set size
-
-        observed_entries, observed_vals \
-            = self.organize_observed_entries(observed_num, train_size, dims, matrices, noise)
-
-        self.test_entries  = observed_entries[train_size :]
-        self.test_vals     = observed_vals[train_size :]
-        self.train_entries = observed_entries[: train_size]
-        self.train_vals    = observed_vals[: train_size]
-
-        end = time.time()
-        print("Generating synthetic count data took: ", end- start)
-        print("max count is: ", self.max_count)
-
-    def create_random_matrix(self, nrow, ncol, m, S):
-        """
-        :param nrow:
-        :param ncol:
-        :param m:
-        :param S:
-        :return:
-        """
-        matrix = np.zeros((nrow, ncol))
-        for i in range(nrow):
-            matrix[i, :] = np.random.multivariate_normal(m, S)
-        return matrix
 
     def organize_observed_entries(self, observed_num, train_size, dims, matrices, noise):
         ndim = len(dims)
@@ -356,6 +231,7 @@ class Tensor(object):
 
         return observed_entries, observed_vals
 
+
     def actual_value(self, m):
         if self.datatype == "real":
             return m
@@ -371,6 +247,7 @@ class Tensor(object):
             return x
         else:
             raise NotImplementedError
+
 
     def find_observed_ui(self, dim, i):
         """
@@ -451,10 +328,4 @@ class Tensor(object):
 
     def save_tensor_data(self, data_folder):
         save_file = os.path.join(data_folder, "tensor.pickled")
-        
-
-
-        
-
-
 

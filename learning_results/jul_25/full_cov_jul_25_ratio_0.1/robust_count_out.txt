@@ -1,3 +1,0 @@
-Generating synthetic real valued data ... 
-Generating synthetic  real valued data took:  7.499870538711548
-Using  0.01  of training data 

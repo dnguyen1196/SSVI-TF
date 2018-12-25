@@ -1,7 +1,0 @@
-Generating synthetic count valued data ... 
-Generating synthetic  count valued data took:  11.469672918319702
-max_count =  49  min count =  0
-Evaluation for true params: 
- test_rsme | train_rsme | rel-te-err | rel-tr-err |  test_nll  |  train_nll |
-2.9746545037 2.9574624556 1.9297919746  1.91721489    91479.81    367436.95  
-Factorizing with max_iteration = 8000  fixing covariance?:  False

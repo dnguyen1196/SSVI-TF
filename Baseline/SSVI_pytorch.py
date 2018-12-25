@@ -74,7 +74,7 @@ class SSVI_torch(torch.nn.Module):
         self.batch_size = 64
         self.lambd = 1/self.batch_size
         self.round_robins_indices = [0 for _ in self.dims]
-        self.k1 = 32
+        self.k1 = 128
 
     def factorize(self, maxiters, algorithm="Adagrad", lr=1, report=[], interval=50, round_robins=True):
         """
@@ -387,24 +387,20 @@ class SSVI_torch(torch.nn.Module):
         # and we're doing gradient ascent
         # natural_mean_grad = (m - m / L**2 + dm + dL * m/L) * -1
         # Roni's derivations: dT/dh = dT/dm - 2dT/dS dm
-        if torch.any(torch.isnan(natural_mean_grad)) or torch.any(torch.isnan(natural_chol_grad)):
-            print("standard!")
-            self.standard_gradient_update_round_robins(expectation_term, kl_term, optimizer, dim, col)
 
-        else:
-            # Replace the gradient with the natural gradient
-            self.means[dim][col].grad = natural_mean_grad
-            # self.means[dim][col].grad = -dm
-            # Compute the NATURAL parameters for the affected columns
+        # Replace the gradient with the natural gradient
+        self.means[dim][col].grad = natural_mean_grad
+        # self.means[dim][col].grad = -dm
+        # Compute the NATURAL parameters for the affected columns
 
-            self.means[dim][col].data = m/(L**2)
+        self.means[dim][col].data = m/(L**2)
 
-            optimizer.step()
+        optimizer.step()
 
-            m_natural = copy.deepcopy(self.means[dim][col].data)
-            m_new = (L**2) * m_natural
-            # Convert from natural parameter form to standard form
-            self.means[dim][col].data = m_new
+        m_natural = copy.deepcopy(self.means[dim][col].data)
+        m_new = (L**2) * m_natural
+        # Convert from natural parameter form to standard form
+        self.means[dim][col].data = m_new
 
     def natural_gradient_update(self, observed_subset, expectation_term, kl_term, optimizer):
         """
@@ -850,24 +846,18 @@ class SSVI_torch(torch.nn.Module):
         element_mult_samples = torch.ones(num_samples, self.k1, self.rank) # shape = (num_samples, k1, rank)
         for dim, nrow in enumerate(self.dims):
             all_rows = [x[dim] for x in entries]
-            # all_cols = Variable(torch.LongTensor(all_cols))
-
-            # all_ms = self.means[dim][all_cols, :] # shape = (num_samples, rank)
-            # all_Ls = self.chols[dim][all_cols, :] # shape = (num_samples, rank)
-
-            # TODO: stack these rows into a matrix
+            # stack these rows into a matrix
             all_ms = torch.stack([self.means[dim][row] for row in all_rows], dim=0)
             all_Ls = torch.stack([self.chols[dim][row] for row in all_rows], dim=0)
 
             sampler = MultivariateNormal(torch.zeros(self.rank), torch.eye(self.rank))
             epsilon_tensor = sampler.sample((num_samples, self.k1))
-            # epsilon_tensor = self.standard_multi_normal.sample((num_samples, self.k1)) # shape = (num_sample, k1, rank)
 
-            # How to create k1 copies (rows of all_ms)
+            # Create k1 copies (rows of all_ms)
             all_ms.unsqueeze_(-1)
             ms_copied = all_ms.expand(num_samples, self.rank, self.k1)
-            # ms_copied = all_ms.repeat(1, self.k1)  # shape = (num_samples, k1, rank)
             ms_copied = ms_copied.transpose(2, 1)
+
             for num in range(num_samples):
                 L_squared = all_Ls[num, :]**2 # shape = (rank)
                 eps_term  =  epsilon_tensor[num, :, :] # shape = (k1, rank)
@@ -941,9 +931,10 @@ class SSVI_torch(torch.nn.Module):
         :param target_matrix:
         :return:
         """
-        dist = Normal(fs_samples, 1)
-        log_pdf = dist.log_prob(target_matrix)
-        # log_pdf = torch.max(log_pdf, torch.FloatTensor([-100]))
+        # dist = Normal(fs_samples, 1)
+        # log_pdf = dist.log_prob(target_matrix)
+        log_pdf = (-0.5 * (fs_samples - target_matrix)**2)
+
         return log_pdf
 
     def compute_log_pdf_bernoulli(self, fs_samples, target_matrix):

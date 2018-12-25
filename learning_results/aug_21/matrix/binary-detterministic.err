@@ -1,6 +1,0 @@
-_frozen_importlib:222: RuntimeWarning: numpy.dtype size changed, may indicate binary incompatibility. Expected 96, got 88
-usage: test.py [-h] [-m {deterministic,simple,robust}]
-               [-d {real,binary,count}] [-r RATIO | -n NOISE] [--diag]
-               [-tr TRAIN_SIZE] [--fixed_cov] [-it NUM_ITERS] [-re REPORT]
-               [--quadrature] [--matrix]
-test.py: error: argument -m/--model: invalid choice: 'detterministic' (choose from 'deterministic', 'simple', 'robust')
