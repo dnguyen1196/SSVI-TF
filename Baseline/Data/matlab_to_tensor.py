@@ -44,10 +44,14 @@ with open(output, "w") as f:
 	f.write("\n")
 	for i in range(num_entries):
 		val = xi[i][0]
-		coordinates = [ids[0][j][i,0] for j in range(num_dimensions)]
+		# Remember that matlab is indexed-1
+		coordinates = [ids[0][j][i,0]-1 for j in range(num_dimensions)]
+		# print(coordinates)
 		out = ",".join([str(x) for x in coordinates]) + "," + str(val)
 		f.write(out)
 		f.write("\n")
+		
+		# count += 1
 		# if count == 10:
 		# 	break
 		

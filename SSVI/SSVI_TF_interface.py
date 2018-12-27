@@ -137,7 +137,7 @@ class SSVI_TF(object):
                 if self.detailed_report:
                     self.report_metrics(iteration, start, mean_change, cov_change)
                 else:
-                    self.report_metrics_mini(iteration, start, mean_change, cov_change)
+                    self.report_metrics_mini(iteration, start, mean_change, cov_change, output_folder)
 
             if max(mean_change, cov_change) < self.epsilon:
                 break
@@ -787,8 +787,8 @@ class SSVI_TF(object):
 
         current = time.time()
         dec = 4
-        rsme_train, error_train = self.evaluate_train_error()
-        rsme_test, error_test   = self.evaluate_test_error()
+        mae_train, error_train = self.evaluate_train_error()
+        mae_test, error_test   = self.evaluate_test_error()
 
         E_term, KL = self.estimate_vlb(self.tensor.train_entries, self.tensor.train_vals)
 
@@ -804,9 +804,9 @@ class SSVI_TF(object):
 
         print('{:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10} {:^10}'\
               .format(iteration, np.around(current - start,2),\
-              np.around(rsme_test, dec), \
+              np.around(mae_test, dec), \
               np.around(error_test, dec), \
-              np.around(rsme_train, dec), \
+              np.around(mae_train, dec), \
               np.around(error_train, dec),\
               np.around(mean_change, dec),\
               np.around(cov_change, dec)), end=" ")
@@ -839,27 +839,33 @@ class SSVI_TF(object):
             print("Using diagonal covariance:", self.diag)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
-            print("iteration |   time   |  d_mean  |   d_cov  |")
+            print("iteration |   time   |  test_err  |  test_mae  |  trainerr  |  trainmae |")
             
-            tensor_savefile = os.path.join(output_folder, "tensor.pickle")
-            with open(tensor_savefile, "wb") as handle:
-                pickle.dump(self.tensor, handle)
+            # tensor_savefile = os.path.join(output_folder, "tensor.pickle")
+            # with open(tensor_savefile, "wb") as handle:
+            #     pickle.dump(self.tensor, handle)
 
         current = time.time()
         dec = 4
-        print("{:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), np.around(mean_change, dec), np.around(cov_change, dec)))
-        if self.noise_added:
-            noise_file = str(iteration) + "_w.txt" 
-            noise_file = os.path.join(output_folder, noise_file)
-            np.save(noise_file,self.w_sigma)
+        mae_train, error_train = self.evaluate_train_error()
+        mae_test, error_test   = self.evaluate_test_error()
 
-        for dim, ncol in enumerate(self.dims):
-            mean_file = str(dim) + "mean_" + str(iteration) + "_" + ".txt"
-            cov_file  = str(dim) + "cov_" + str(iteration) + "_"  + ".txt"
-            mean_file = os.path.join(output_folder, mean_file)
-            cov_file = os.path.join(output_folder, cov_file)
-            self.posterior.save_mean_params(dim,mean_file)
-            self.posterior.save_cov_parameters(dim,cov_file)
+        print("{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), \
+                                                    np.around(error_test, dec), np.around(mae_test, dec),\
+                                                    np.around(error_train, dec), np.around(mae_train, dec)))
+        
+        # if self.noise_added:
+        #     noise_file = str(iteration) + "_w.txt" 
+        #     noise_file = os.path.join(output_folder, noise_file)
+        #     np.save(noise_file,self.w_sigma)
+
+        # for dim, ncol in enumerate(self.dims):
+        #     mean_file = str(dim) + "mean_" + str(iteration) + "_" + ".txt"
+        #     cov_file  = str(dim) + "cov_" + str(iteration) + "_"  + ".txt"
+        #     mean_file = os.path.join(output_folder, mean_file)
+        #     cov_file = os.path.join(output_folder, cov_file)
+        #     self.posterior.save_mean_params(dim,mean_file)
+        #     self.posterior.save_cov_parameters(dim,cov_file)
 
 
     def estimate_vlb(self, entries, values):

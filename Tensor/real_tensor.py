@@ -1,10 +1,15 @@
 from Tensor.Tensor import Tensor
 import numpy as np
 
+
+def identity(m):
+    return m
+
 class RV_tensor(Tensor):
     def __init__(self):
         super(RV_tensor, self).__init__(datatype="real")
-        self.link_fun = lambda m: m
+        # self.link_fun = lambda m: m
+        self.link_fun = identity
 
     def generate_hidden_matrices(self, means, covariances):
         ndim = len(self.dims)

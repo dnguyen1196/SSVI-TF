@@ -73,7 +73,6 @@ class Tensor(object):
         self.test_entries  = np.take(entries, test_indices, axis=0)
         self.test_vals = np.take(vals, test_indices, axis=0)
 
-
         self.observed_by_id = [[[] for _ in range(x)] for x in self.dims]
 
         for i in range(len(self.train_entries)):

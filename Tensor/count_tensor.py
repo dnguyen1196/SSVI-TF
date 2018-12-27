@@ -6,7 +6,8 @@ class count_tensor(Tensor):
     def __init__(self):
         super(count_tensor, self).__init__(datatype="count")
 
-        self.link_fun = lambda m: probs.poisson_link(m)
+        # self.link_fun = lambda m: probs.poisson_link(m)
+        self.link_fun = probs.poisson_link
         self.min_count = 100
         self.max_count = 0
 
