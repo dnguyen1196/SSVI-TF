@@ -1,0 +1,5 @@
+learning_results/dec_27/gdelt/
+gdelt.txt
+count
+deterministic
+simple
