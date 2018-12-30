@@ -7,9 +7,9 @@ read outdir # output directory
 read filename # Filename
 read datatype # datatype
 echo "Output directory: $outdir"
-echo "Filename: $filename" 
+echo "Filename: $filename"
 
-script="python -u real_test.py --diag -f Baseline/Data/$filename -d $datatype"
+script="python -u real_test.py -it 20000 --diag -f Baseline/Data/$filename -d $datatype"
 
 while IFS=' ' read -r model
 do

@@ -1,5 +1,5 @@
-learning_results/dec_27/gdelt/
-gdelt.txt
+learning_results/dec_30/facebook_mean_0/
+facebook_links.txt
 count
-deterministic
 simple
+deterministic

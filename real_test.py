@@ -24,7 +24,7 @@ parser.add_argument("-ceta", "--cov_eta", type=float, help="cov eta", default=1.
 parser.add_argument("-meta", "--mean_eta", type=float, help="mean eta", default=1.0)
 parser.add_argument("-k1", "--k1", type=int, help="k1 samples", default=64)
 parser.add_argument("-k2", "--k2", type=int, help="k2 samples", default=128)
-parser.add_argument("-R", "--rank", type=int, help="factorization rank", default=20)
+parser.add_argument("-R", "--rank", type=int, help="factorization rank", default=50)
 parser.add_argument("-o", "--output", type=str, help="Output folder", default="learning_results")
 
 
@@ -58,7 +58,7 @@ else:
 tensor.read_from_file(filename, 0.8, 0, 0.2)
 
 # Initialize the parameters for the algorithm
-default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : 20}
+default_params = {"mean_update" : "S", "cov_update" : "N", "rank" : D}
 factorizer_param = {"eta" : 1, "cov_eta": 0.001}
 
 params            = {**default_params, **factorizer_param, "tensor" : tensor }
@@ -68,6 +68,8 @@ params["k1"]      = args.k1
 params["k2"]      = args.k2
 params["diag"]    = diag
 
+# Try different mean0 initialization
+params["mean0"]  = np.zeros((D,))
 
 if model == "deterministic":
     factorizer = SSVI_TF_d(**params)
