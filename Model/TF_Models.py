@@ -12,7 +12,7 @@ class Posterior(object):
         self.params = [[] for _ in self.dims]
 
         if initMean is None or initCov is None:
-            self.initMean = np.ones((self.D,))
+            self.initMean = np.ones((self.D,)) 
             self.initCov  = np.eye(self.D)
 
         for i, s in enumerate(self.dims):

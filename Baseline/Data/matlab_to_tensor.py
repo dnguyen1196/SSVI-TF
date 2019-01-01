@@ -60,7 +60,7 @@ with open(output, "w") as f:
 			for k in range(max_dim3):
 				if k != coordinates[relation_dim]:
 					neg_coordinates = coordinates[:-1] + [k]
-					out = ",".join([str(x) for x in neg_coordinates]) + "," + str(0)
+					out = ",".join([str(x) for x in neg_coordinates]) + "," + str(-1)
 					f.write(out)
 					f.write("\n")
 
