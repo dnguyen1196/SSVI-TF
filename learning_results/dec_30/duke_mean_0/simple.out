@@ -6,3 +6,7 @@ Using diagonal covariance: True
 k1 samples =  64  k2 samples =  128
 eta =  1.0  cov eta =  1.0  sigma eta =  1
 iteration |   time   |  test_err  |  test_mae  |  trainerr  |  trainmae |
+    0         9.23       0.0      53.3877      0.0      53.3549  
+    5       28520.16     0.0      52.9601      0.0       52.919  
+    10      58706.76     0.0       52.766      0.0      52.7072  
+    20      91529.09     0.0      52.4089      0.0      52.3826  
