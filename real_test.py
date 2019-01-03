@@ -69,7 +69,7 @@ params["k2"]      = args.k2
 params["diag"]    = diag
 
 # Try different mean0 initialization
-params["mean0"]  = np.zeros((D,))
+# params["mean0"]  = np.zeros((D,))
 
 if model == "deterministic":
     factorizer = SSVI_TF_d(**params)

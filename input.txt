@@ -1,5 +1,5 @@
-learning_results/dec_31/nation/
-nation.txt
+learning_results/jan_1/kinship/
+kinship.txt
 binary
 simple
 deterministic
