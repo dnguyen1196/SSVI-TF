@@ -1,5 +1,5 @@
-learning_results/jan_1/kinship/
-kinship.txt
-binary
+learning_results/jan_3/duke_d20/
+duke_citation.txt
+count
 simple
 deterministic

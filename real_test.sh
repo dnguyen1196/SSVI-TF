@@ -9,7 +9,7 @@ read datatype # datatype
 echo "Output directory: $outdir"
 echo "Filename: $filename"
 
-script="python -u real_test.py -it 20000 --diag -f Baseline/Data/$filename -d $datatype"
+script="python -u real_test.py -it 75000 -re 5000 --rank 20 -f Baseline/Data/$filename -d $datatype"
 
 while IFS=' ' read -r model
 do

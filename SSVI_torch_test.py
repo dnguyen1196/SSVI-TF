@@ -33,7 +33,7 @@ test_tensor = synthesize_tensor([20, 20, 20], "real", True, 0.05)
 # test_tensor.reduce_train_size(0.05)
 
 gradient_update = "S"
-rank = 20
+rank = 50
 
 factorizer = SSVI_torch(test_tensor, gradient_update=gradient_update, rank=rank)
 

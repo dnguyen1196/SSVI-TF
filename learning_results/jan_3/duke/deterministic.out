@@ -1,0 +1,16 @@
+Factorizing with max_iteration = 75000  fixing covariance?:  False
+Tensor dimension: [2370, 8663, 4066]
+Mean update: S
+Cov update: N
+Using diagonal covariance: True
+k1 samples =  64  k2 samples =  128
+eta =  1.0  cov eta =  1.0  sigma eta =  1
+iteration |   time   |  test_err  |  test_mae  |  trainerr  |  trainmae |
+    0         5.68       0.0      52.6887      0.0       52.667  
+    5       24092.64     0.0      52.2828      0.0      52.2862  
+    10      48146.62     0.0      52.1311      0.0      52.1239  
+    20      72233.46     0.0      51.7651      0.0      51.7639  
+    50      96389.63     0.0       49.934      0.0      49.9564  
+   100     120887.83     0.0      47.7314      0.0      47.7785  
+   200     145340.02     0.0      44.4584      0.0      44.5269  
+   5000    200038.52     0.0      10.3268      0.0      10.1897  
