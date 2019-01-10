@@ -237,7 +237,7 @@ class SSVI_TF(object):
         :return:
         Note that robust model will have a completely different implementation of this
         function
-        """ 
+        """
         num_subsamples     = np.size(coords, axis=0) # Number of subsamples
         othercols_left     = coords[:, : dim]
         othercols_right    = coords[:, dim + 1 :]
@@ -334,7 +334,7 @@ class SSVI_TF(object):
 
         variances = np.random.rayleigh(self.w_sigma**2, size=(self.k1,))
         fijks = np.random.normal(meanf, variances, size=(self.k2, self.k1))
-        s = self.likelihood_param 
+        s = self.likelihood_param
         #shape (k1,)
         fst_deriv = np.average(self.likelihood.fst_derivative_log_pdf(y, fijks, s), axis=0)
         res = Vks * fst_deriv[:, np.newaxis]
@@ -469,7 +469,7 @@ class SSVI_TF(object):
         fs = np.dot(Wks, m) # (k1,)
         if self.noise_added:
             fs = np.random.normal(fs, self.w_sigma)
-        # We want to multiply each row by the corresponding f_ijk 
+        # We want to multiply each row by the corresponding f_ijk
         res = Wks * fs[:,np.newaxis]
         #res = Wks * fs
         assert(res.shape == (self.k1,self.D))
@@ -489,7 +489,7 @@ class SSVI_TF(object):
 
         # NOTE: we want to compute an array of vj^Svj
         # The short cut is take np.inner(S, vj) -> (D,k1)
-        # then take product with vj again 
+        # then take product with vj again
         if self.diag:
             variances = np.sum(np.multiply(Vks.transpose(), np.inner(np.diag(S), Vks)), axis=0)
         else:
@@ -513,7 +513,7 @@ class SSVI_TF(object):
             v = otherms[k, :]
             C = othercovs[k, :, :]
             B *= np.outer(v,v) + C
-        return np.dot(B, m) 
+        return np.dot(B, m)
 
 
     def compute_covariance_V_W(self, Vks, Wks, B):
@@ -539,7 +539,7 @@ class SSVI_TF(object):
         uis_mui = uis - m
         hs = np.dot(uis_mui, np.transpose(np.linalg.inv(S)))
         assert(hs.shape == (self.k1, self.D))
-        return hs 
+        return hs
 
 
     def compute_expected_H(self):
@@ -755,7 +755,7 @@ class SSVI_TF(object):
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     Functions to report metrics (error, vlb, etc)
-    
+
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -773,7 +773,9 @@ class SSVI_TF(object):
             print("Mean update scheme: ", self.mean_update)
             print("Covariance update : ", self.cov_update)
             print("Using diagonal covariance?: ", self.diag)
+            print("Factorization rank: ", self.D)
             print("Random start?", self.randstart)
+
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
             print("iteration |   time   | test_mae |rel-te-err|train_mae |rel-tr-err|",end=" ")
@@ -837,10 +839,11 @@ class SSVI_TF(object):
             print("Mean update:", self.mean_update)
             print("Cov update:", self.cov_update)
             print("Using diagonal covariance:", self.diag)
+            print("Factorization rank: ", self.D)
             print("k1 samples = ", self.k1, " k2 samples = ", self.k2)
             print("eta = ", self.eta, " cov eta = ", self.cov_eta, " sigma eta = ", self.sigma_eta)
             print("iteration |   time   |  test_err  |  test_mae  |  trainerr  |  trainmae |")
-            
+
             # tensor_savefile = os.path.join(output_folder, "tensor.pickle")
             # with open(tensor_savefile, "wb") as handle:
             #     pickle.dump(self.tensor, handle)
@@ -853,9 +856,9 @@ class SSVI_TF(object):
         print("{:^10} {:^10} {:^10} {:^10} {:^10} {:^10}".format(iteration, np.around(current-start, 2), \
                                                     np.around(error_test, dec), np.around(mae_test, dec),\
                                                     np.around(error_train, dec), np.around(mae_train, dec)))
-        
+
         # if self.noise_added:
-        #     noise_file = str(iteration) + "_w.txt" 
+        #     noise_file = str(iteration) + "_w.txt"
         #     noise_file = os.path.join(output_folder, noise_file)
         #     np.save(noise_file,self.w_sigma)
 
@@ -1054,8 +1057,8 @@ class SSVI_TF(object):
                 return 1 if res >= 1/2 else -1
             elif self.likelihood_type == "poisson":
                 return np.rint(res)
-    
-    
+
+
     """
     Bridge function
     """
@@ -1180,7 +1183,7 @@ class SSVI_TF(object):
             fs = np.random.normal(ms, ws, size=(self.predict_num_samples, self.predict_num_samples))
         else: # deterministic model
             fs = ms
-        
+
         # TODO: this is not doing sampling
         predict = self.link_fun(fs)
         return np.mean(predict)

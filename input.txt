@@ -1,5 +1,5 @@
-learning_results/jan_3/duke_d20/
-duke_citation.txt
+learning_results/jan_6/umls/
+umls.txt
 count
 simple
 deterministic
