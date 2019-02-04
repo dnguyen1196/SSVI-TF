@@ -1,5 +1,6 @@
-learning_results/jan_10/duke/
-duke_citation.txt
-count
+learning_results/jan_29/umls/
+umls.txt
+binary
 simple
+robust
 deterministic
